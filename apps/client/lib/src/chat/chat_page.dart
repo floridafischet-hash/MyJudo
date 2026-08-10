@@ -183,8 +183,9 @@ class _ChatPageState extends State<ChatPage> {
             onSend: _send,
           );
         }
-        if (constraints.maxWidth < 720)
+        if (constraints.maxWidth < 720) {
           return _ChatList(chats: _chats, onSelect: _loadMessages);
+        }
         return Row(
           children: [
             SizedBox(
