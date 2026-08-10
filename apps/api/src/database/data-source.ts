@@ -1,7 +1,6 @@
 import 'reflect-metadata';
 import { DataSource } from 'typeorm';
 import { AuditLog } from '../audit/audit-log.entity';
-import { Session } from '../auth/session.entity';
 import { Organization } from '../organizations/organization.entity';
 import { Permission } from '../rbac/permission.entity';
 import { RolePermission } from '../rbac/role-permission.entity';
@@ -22,7 +21,6 @@ export default new DataSource({
     UserRole,
     RolePermission,
     AuditLog,
-    Session,
     Member,
     Invitation,
   ],

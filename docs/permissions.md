@@ -5,6 +5,11 @@ enthalten Berechtigungen. Mehrfachrollen ergeben die Vereinigungsmenge der
 aktiven Berechtigungen. Es gibt keine fachliche Autorisierung über hartcodierte
 Rollennamen.
 
+Keycloak ist Source of Truth für Identität und die grobe Realm-Rolle
+`superuser`; MyJudo bleibt Source of Truth für Fachrollen und Permissions.
+Superuser-Zugriff erfordert die Rolle in beiden Systemen. Die Superuser-Rolle
+enthält `chat.psg.access` bewusst nicht; PSG bleibt separat geschützt.
+
 Jeder Zugriff prüft mindestens:
 
 1. gültige Authentifizierung und aktive Session,

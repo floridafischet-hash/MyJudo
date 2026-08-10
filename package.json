@@ -9,7 +9,8 @@
     "lint": "npm run lint --workspace @myjudo/api",
     "test": "npm run test --workspace @myjudo/api",
     "test:cov": "npm run test:cov --workspace @myjudo/api",
-    "typecheck": "npm run typecheck --workspace @myjudo/api"
+    "typecheck": "npm run typecheck --workspace @myjudo/api",
+    "token-usage:record": "node scripts/record-token-usage.mjs"
   },
   "engines": { "node": ">=22 <25" }
 }

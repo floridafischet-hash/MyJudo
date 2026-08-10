@@ -11,7 +11,6 @@ import { Role } from './rbac/role.entity';
 import { UserRole } from './rbac/user-role.entity';
 import { RolePermission } from './rbac/role-permission.entity';
 import { AuditLog } from './audit/audit-log.entity';
-import { Session } from './auth/session.entity';
 import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -38,7 +37,6 @@ import { InvitationsModule } from './invitations/invitations.module';
           UserRole,
           RolePermission,
           AuditLog,
-          Session,
           Member,
           Invitation,
         ],

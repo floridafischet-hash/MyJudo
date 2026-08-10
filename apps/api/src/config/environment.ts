@@ -1,4 +1,11 @@
-const REQUIRED_SECRETS = ['DATABASE_URL', 'JWT_ACCESS_SECRET', 'PASSWORD_PEPPER', 'APP_ORIGIN'];
+const REQUIRED_SECRETS = [
+  'DATABASE_URL',
+  'APP_ORIGIN',
+  'KEYCLOAK_URL',
+  'KEYCLOAK_REALM',
+  'KEYCLOAK_CLIENT_ID',
+  'KEYCLOAK_AUDIENCE',
+];
 
 export function validateEnvironment(environment: Record<string, unknown>): Record<string, unknown> {
   const missing = REQUIRED_SECRETS.filter((key) => {
@@ -8,10 +15,6 @@ export function validateEnvironment(environment: Record<string, unknown>): Recor
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
-  const jwtSecret = String(environment.JWT_ACCESS_SECRET);
-  if (jwtSecret.length < 32) {
-    throw new Error('JWT_ACCESS_SECRET must contain at least 32 characters');
-  }
   const rawPort = environment.PORT ?? '3000';
   if (typeof rawPort !== 'string' && typeof rawPort !== 'number') {
     throw new Error('PORT must be an integer between 1 and 65535');
@@ -20,5 +23,5 @@ export function validateEnvironment(environment: Record<string, unknown>): Recor
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer between 1 and 65535');
   }
-  return { ...environment, PORT: port, JWT_ACCESS_TTL: environment.JWT_ACCESS_TTL ?? '15m' };
+  return { ...environment, PORT: port };
 }

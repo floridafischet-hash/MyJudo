@@ -37,4 +37,20 @@ export class PermissionService {
     );
     return rows.map((row) => row.key);
   }
+
+  async hasRole(userId: string, organizationId: string, roleName: string): Promise<boolean> {
+    const rows: Array<{ present: boolean }> = await this.dataSource.query(
+      `SELECT EXISTS (
+         SELECT 1
+         FROM user_roles user_role
+         INNER JOIN roles role ON role.id = user_role."roleId"
+         WHERE user_role."userId" = $1
+           AND role."organizationId" = $2
+           AND role.name = $3
+           AND role."deletedAt" IS NULL
+       ) AS present`,
+      [userId, organizationId, roleName],
+    );
+    return rows[0]?.present === true;
+  }
 }

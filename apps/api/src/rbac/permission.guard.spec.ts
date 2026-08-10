@@ -7,6 +7,8 @@ function contextWithUser(user?: {
   id: string;
   organizationId: string;
   authorizationVersion: number;
+  identityProviderSubject: string;
+  identityRoles: string[];
 }): ExecutionContext {
   return {
     getHandler: () => function handler() {},
@@ -17,7 +19,7 @@ function contextWithUser(user?: {
 
 describe('PermissionGuard', () => {
   const reflector = { getAllAndOverride: jest.fn() } as unknown as Reflector;
-  const permissions = { hasAll: jest.fn() } as unknown as PermissionService;
+  const permissions = { hasAll: jest.fn(), hasRole: jest.fn() } as unknown as PermissionService;
   const guard = new PermissionGuard(reflector, permissions);
 
   beforeEach(() => jest.clearAllMocks());
@@ -32,7 +34,13 @@ describe('PermissionGuard', () => {
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(false);
     await expect(
       guard.canActivate(
-        contextWithUser({ id: 'user', organizationId: 'org', authorizationVersion: 0 }),
+        contextWithUser({
+          id: 'user',
+          organizationId: 'org',
+          authorizationVersion: 0,
+          identityProviderSubject: 'subject',
+          identityRoles: [],
+        }),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
@@ -42,8 +50,30 @@ describe('PermissionGuard', () => {
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(true);
     await expect(
       guard.canActivate(
-        contextWithUser({ id: 'user', organizationId: 'org', authorizationVersion: 0 }),
+        contextWithUser({
+          id: 'user',
+          organizationId: 'org',
+          authorizationVersion: 0,
+          identityProviderSubject: 'subject',
+          identityRoles: [],
+        }),
       ),
     ).resolves.toBe(true);
+  });
+
+  it('requires both identity and local role for superuser and never bypasses PSG', async () => {
+    const user = contextWithUser({
+      id: 'user',
+      organizationId: 'org',
+      authorizationVersion: 0,
+      identityProviderSubject: 'subject',
+      identityRoles: ['superuser'],
+    });
+    jest.spyOn(permissions, 'hasRole').mockResolvedValue(true);
+    jest.spyOn(permissions, 'hasAll').mockResolvedValue(false);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['roles.manage']);
+    await expect(guard.canActivate(user)).resolves.toBe(true);
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['chat.psg.access']);
+    await expect(guard.canActivate(user)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });

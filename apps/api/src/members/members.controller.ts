@@ -22,6 +22,7 @@ import { MembersService } from './members.service';
 import type { Response } from 'express';
 import { Res } from '@nestjs/common';
 import { ListMembersDto } from './dto/list-members.dto';
+import { UpdateMemberDto } from './dto/update-member.dto';
 
 interface MemberRequest {
   user: AuthenticatedUser;
@@ -50,10 +51,27 @@ export class MembersController {
   exportXlsx(@Req() request: MemberRequest, @Res() response: Response): Promise<void> {
     return this.members.exportXlsx(request.user, response);
   }
+  @Get(':id')
+  @RequirePermissions('members.view')
+  detail(
+    @Req() request: MemberRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ): Promise<Member> {
+    return this.members.detail(request.user, id);
+  }
   @Post()
   @RequirePermissions('members.create')
   create(@Req() request: MemberRequest, @Body() dto: CreateMemberDto): Promise<Member> {
     return this.members.create(request.user, dto);
+  }
+  @Patch(':id')
+  @RequirePermissions('members.edit')
+  update(
+    @Req() request: MemberRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: UpdateMemberDto,
+  ): Promise<Member> {
+    return this.members.update(request.user, id, dto);
   }
   @Patch(':id/status')
   @RequirePermissions('members.status.change')

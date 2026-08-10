@@ -16,13 +16,13 @@ Weitere Mitglieder- und Fachmodule sind noch nicht als fertig zu betrachten.
 - Client: Flutter (geplant; Toolchain wird eingerichtet)
 - Backend: NestJS/TypeScript
 - Datenbank: PostgreSQL 17
-- Auth: Argon2id, kurze JWT-Access-Tokens, rotierende Refresh-Sessions
+- Auth: Keycloak 26.7, OpenID Connect Authorization Code mit PKCE
 - Berechtigungen: mandantenbezogenes RBAC mit explizitem PSG-Scope
 - Deployment: Docker Compose hinter Nginx/TLS
 - Zielroute: `https://212.227.20.171:18780`
 
 Details stehen in [docs/architecture.md](docs/architecture.md),
-[docs/permissions.md](docs/permissions.md) und
+[docs/permissions.md](docs/permissions.md), [docs/keycloak.md](docs/keycloak.md) und
 [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## Entwicklung
@@ -52,9 +52,9 @@ npm run migration:revert --workspace @myjudo/api
 npm run seed --workspace @myjudo/api
 ```
 
-Der Seed ist idempotent und benötigt die `INITIAL_*`-Variablen aus
-`.env.example`. Das Initialpasswort gehört ausschließlich in einen Secret Store
-und muss nach dem Deployment gewechselt werden.
+Der Seed ist idempotent und legt Organisation, Permissions und Rollen an.
+Keycloak-Benutzer werden anschließend über den dokumentierten, serverseitigen
+Bootstrap verknüpft; Passwörter stehen niemals im Repository.
 
 ## Tests und Builds
 
@@ -76,7 +76,7 @@ flutter pub get
 dart format --output=none --set-exit-if-changed lib test
 flutter analyze
 flutter test
-flutter build web --release --dart-define=API_BASE_URL=https://example.org/api/v1
+flutter build web --release --dart-define=API_BASE_URL=https://example.org/api/v1 --dart-define=KEYCLOAK_URL=https://example.org/keycloak
 flutter build windows --release
 flutter build apk --release
 ```
@@ -94,7 +94,8 @@ binden.
 
 - Jede Fachaktion wird serverseitig authentifiziert und autorisiert.
 - PSG-Zugriff ist nicht Bestandteil von Vorstand oder Trainer.
-- Refresh-Tokens werden nur gehasht gespeichert und bei Nutzung rotiert.
+- Passwörter, Login, Reset und Sessions liegen ausschließlich in Keycloak.
+- Das Backend validiert RS256-Signatur, Issuer, Audience und Ablauf über JWKS.
 - Geheimnisse, Schlüssel und Zertifikate sind durch `.gitignore` ausgeschlossen.
 - Login und Registrierung sind rate-limitiert.
 - Audit-Logs speichern keine Passwörter, Tokens oder Chat-Inhalte.
@@ -104,7 +105,7 @@ TLS, Datenschutzkonzept, Backup/Restore-Test und fachliche Rollenabnahme nötig.
 
 ## Rollen
 
-Das Fundament seedet Vorstand, Trainer, Jugendtrainer, PSG/Kinderschutz,
+Das Fundament seedet Superuser, Vorstand, Trainer, Jugendtrainer, PSG/Kinderschutz,
 Vereinsarbeit/Funktionäre und Mitglied/Eltern. Rollen sind reine Sammlungen von
 Permissions; Endpunkte prüfen konkrete Permissions statt Rollennamen.
 
@@ -117,3 +118,10 @@ Permissions; Endpunkte prüfen konkrete Permissions statt Rollennamen.
 
 Der detaillierte, testorientierte Plan steht in
 [docs/implementation-plan.md](docs/implementation-plan.md).
+
+## Token Usage / Development Costs
+
+Messbare OpenClaw-/Codex-Usage-Daten werden ausschließlich unter
+[docs/token-usage](docs/token-usage/README.md) protokolliert. Die Metriken sind
+nicht Teil der Vereins-App. Fehlende Token- oder Kostendaten werden als
+`nicht verfügbar` markiert und niemals geschätzt.

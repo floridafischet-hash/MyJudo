@@ -1,5 +1,4 @@
 import 'reflect-metadata';
-import * as argon2 from 'argon2';
 import dataSource from './data-source';
 import { Organization } from '../organizations/organization.entity';
 import { Permission } from '../rbac/permission.entity';
@@ -13,9 +12,8 @@ import { UserRole } from '../rbac/user-role.entity';
 async function seed(): Promise<void> {
   const organizationSlug = required('INITIAL_ORGANIZATION_SLUG');
   const organizationName = required('INITIAL_ORGANIZATION_NAME');
-  const adminEmail = required('INITIAL_ADMIN_EMAIL').trim().toLocaleLowerCase('en-US');
-  const adminPassword = required('INITIAL_ADMIN_PASSWORD');
-  const pepper = required('PASSWORD_PEPPER');
+  const adminEmail = process.env.INITIAL_ADMIN_EMAIL?.trim().toLocaleLowerCase('en-US');
+  const adminSubject = process.env.INITIAL_ADMIN_KEYCLOAK_SUBJECT?.trim();
 
   await dataSource.initialize();
   await dataSource.transaction(async (manager) => {
@@ -41,8 +39,12 @@ async function seed(): Promise<void> {
     const permissions = await manager.getRepository(Permission).find();
     const permissionsByKey = new Map(permissions.map((permission) => [permission.key, permission]));
 
+    const roleCatalog = {
+      ...STANDARD_ROLE_PERMISSIONS,
+      Superuser: PERMISSIONS.filter((permission) => permission !== 'chat.psg.access'),
+    };
     const rolesByName = new Map<string, Role>();
-    for (const [name, rolePermissions] of Object.entries(STANDARD_ROLE_PERMISSIONS)) {
+    for (const [name, rolePermissions] of Object.entries(roleCatalog)) {
       let role = await manager
         .getRepository(Role)
         .findOneBy({ organizationId: organization.id, name });
@@ -66,16 +68,16 @@ async function seed(): Promise<void> {
       }
     }
 
-    let admin = await manager.getRepository(User).findOneBy({
-      organizationId: organization.id,
-      email: adminEmail,
-    });
+    if (!adminEmail || !adminSubject) return;
+    let admin = await manager
+      .getRepository(User)
+      .findOneBy({ organizationId: organization.id, email: adminEmail });
     if (!admin) {
       admin = await manager.getRepository(User).save(
         manager.getRepository(User).create({
           organizationId: organization.id,
           email: adminEmail,
-          passwordHash: await argon2.hash(`${adminPassword}${pepper}`, { type: argon2.argon2id }),
+          identityProviderSubject: adminSubject,
           firstName: 'Initial',
           lastName: 'Administrator',
           status: UserStatus.Approved,
@@ -85,13 +87,16 @@ async function seed(): Promise<void> {
       );
       admin.approvedBy = admin.id;
       await manager.getRepository(User).save(admin);
+    } else if (!admin.identityProviderSubject) {
+      admin.identityProviderSubject = adminSubject;
+      await manager.getRepository(User).save(admin);
     }
-    const boardRole = rolesByName.get('Vorstand');
-    if (!boardRole) throw new Error('Board role was not seeded');
+    const superuserRole = rolesByName.get('Superuser');
+    if (!superuserRole) throw new Error('Superuser role was not seeded');
     await manager
       .getRepository(UserRole)
       .upsert(
-        { userId: admin.id, roleId: boardRole.id, assignedBy: admin.id },
+        { userId: admin.id, roleId: superuserRole.id, assignedBy: admin.id },
         { conflictPaths: ['userId', 'roleId'], skipUpdateIfNoValuesChanged: true },
       );
   });

@@ -16,6 +16,7 @@ import { Member } from './member.entity';
 import type { Response } from 'express';
 import { strToU8, zipSync } from 'fflate';
 import { ListMembersDto, SortOrder } from './dto/list-members.dto';
+import { UpdateMemberDto } from './dto/update-member.dto';
 
 @Injectable()
 export class MembersService {
@@ -85,6 +86,65 @@ export class MembersService {
     } catch (error) {
       if (isUniqueViolation(error))
         throw new ConflictException('Die Mitgliedsnummer ist bereits vergeben.');
+      throw error;
+    }
+  }
+
+  async detail(actor: AuthenticatedUser, memberId: string): Promise<Member> {
+    const member = await this.members.findOneBy({
+      id: memberId,
+      organizationId: actor.organizationId,
+    });
+    if (!member) throw new NotFoundException('Mitglied wurde nicht gefunden.');
+    return member;
+  }
+
+  async update(actor: AuthenticatedUser, memberId: string, dto: UpdateMemberDto): Promise<Member> {
+    if (Object.values(dto).every((value) => value === undefined)) {
+      throw new BadRequestException('Mindestens ein Feld muss geändert werden.');
+    }
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const repository = manager.getRepository(Member);
+        const member = await repository.findOne({
+          where: { id: memberId, organizationId: actor.organizationId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!member) throw new NotFoundException('Mitglied wurde nicht gefunden.');
+        const changedFields: string[] = [];
+        if (dto.memberNumber !== undefined && member.memberNumber !== dto.memberNumber.trim()) {
+          member.memberNumber = dto.memberNumber.trim();
+          changedFields.push('memberNumber');
+        }
+        if (dto.firstName !== undefined && member.firstName !== dto.firstName.trim()) {
+          member.firstName = dto.firstName.trim();
+          changedFields.push('firstName');
+        }
+        if (dto.lastName !== undefined && member.lastName !== dto.lastName.trim()) {
+          member.lastName = dto.lastName.trim();
+          changedFields.push('lastName');
+        }
+        if (dto.birthDate !== undefined && member.birthDate !== dto.birthDate) {
+          member.birthDate = dto.birthDate;
+          changedFields.push('birthDate');
+        }
+        if (changedFields.length === 0) return member;
+        const saved = await repository.save(member);
+        await manager.getRepository(AuditLog).save({
+          organizationId: actor.organizationId,
+          actorUserId: actor.id,
+          action: 'member.updated',
+          entityType: 'member',
+          entityId: member.id,
+          outcome: 'success',
+          metadata: { changedFields },
+        });
+        return saved;
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException('Die Mitgliedsnummer ist bereits vergeben.');
+      }
       throw error;
     }
   }

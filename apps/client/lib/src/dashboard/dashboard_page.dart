@@ -49,6 +49,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           index: _selectedIndex,
           accessToken: session?.accessToken,
           permissions: session?.permissions ?? const {},
+          greetingName: session?.greetingName ?? '',
         );
         if (!desktop) {
           return Scaffold(
@@ -112,10 +113,12 @@ class _Content extends ConsumerWidget {
     required this.index,
     required this.accessToken,
     required this.permissions,
+    required this.greetingName,
   });
   final int index;
   final String? accessToken;
   final Set<String> permissions;
+  final String greetingName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -130,6 +133,15 @@ class _Content extends ConsumerWidget {
       padding: const EdgeInsets.all(24),
       children: [
         Text(titles[index], style: Theme.of(context).textTheme.headlineMedium),
+        if (index == 0 && greetingName.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Hallo $greetingName',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+        ],
         const SizedBox(height: 16),
         if (index == 0)
           const Wrap(

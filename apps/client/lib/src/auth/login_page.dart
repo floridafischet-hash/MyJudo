@@ -3,30 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'auth_controller.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
+class LoginPage extends ConsumerWidget {
   const LoginPage({super.key, this.initialError});
   final String? initialError;
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
-}
-
-class _LoginPageState extends ConsumerState<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _username = TextEditingController();
-  final _password = TextEditingController();
-
-  @override
-  void dispose() {
-    _username.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
-    final error = auth.hasError ? auth.error.toString() : widget.initialError;
+    final error = auth.hasError ? auth.error.toString() : initialError;
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -37,67 +21,48 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(28),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'MyJudo',
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Sicher bei deinem Verein anmelden',
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 28),
-                        TextFormField(
-                          controller: _username,
-                          decoration: const InputDecoration(
-                            labelText: 'Benutzername',
-                          ),
-                          autofillHints: const [AutofillHints.username],
-                          textInputAction: TextInputAction.next,
-                          validator: _required,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _password,
-                          decoration: const InputDecoration(
-                            labelText: 'Passwort',
-                          ),
-                          obscureText: true,
-                          autofillHints: const [AutofillHints.password],
-                          onFieldSubmitted: (_) => _submit(),
-                          validator: _required,
-                        ),
-                        if (error != null) ...[
-                          const SizedBox(height: 16),
-                          Semantics(
-                            liveRegion: true,
-                            child: Text(
-                              error,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        'MyJudo',
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sicher über Keycloak bei deinem Verein anmelden',
+                        style: Theme.of(context).textTheme.bodyLarge,
+                      ),
+                      if (error != null) ...[
+                        const SizedBox(height: 20),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            error,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
                             ),
                           ),
-                        ],
-                        const SizedBox(height: 24),
-                        FilledButton(
-                          onPressed: auth.isLoading ? null : _submit,
-                          child: auth.isLoading
-                              ? const SizedBox.square(
-                                  dimension: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text('Anmelden'),
                         ),
                       ],
-                    ),
+                      const SizedBox(height: 28),
+                      FilledButton.icon(
+                        onPressed: auth.isLoading
+                            ? null
+                            : () => ref
+                                  .read(authControllerProvider.notifier)
+                                  .login(),
+                        icon: auth.isLoading
+                            ? const SizedBox.square(
+                                dimension: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.login),
+                        label: const Text('Anmelden'),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -106,15 +71,5 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         ),
       ),
     );
-  }
-
-  String? _required(String? value) =>
-      value == null || value.trim().isEmpty ? 'Pflichtfeld' : null;
-
-  void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    ref
-        .read(authControllerProvider.notifier)
-        .login(username: _username.text.trim(), password: _password.text);
   }
 }

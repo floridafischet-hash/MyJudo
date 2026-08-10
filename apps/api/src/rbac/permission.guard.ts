@@ -23,6 +23,11 @@ export class PermissionGuard implements CanActivate {
     if (!required || required.length === 0) return true;
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     if (!request.user) throw new ForbiddenException();
+    const identitySuperuser = request.user.identityRoles.includes('superuser');
+    const localSuperuser = identitySuperuser
+      ? await this.permissions.hasRole(request.user.id, request.user.organizationId, 'Superuser')
+      : false;
+    if (localSuperuser && !required.includes('chat.psg.access')) return true;
     if (!(await this.permissions.hasAll(request.user.id, request.user.organizationId, required))) {
       throw new ForbiddenException('Für diese Aktion fehlt die erforderliche Berechtigung.');
     }
