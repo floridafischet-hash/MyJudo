@@ -14,6 +14,10 @@ Realm: `myjudo`. Der öffentliche Client `myjudo-client` verwendet ausschließli
 Authorization Code mit PKCE S256. Direct Access Grant und Implicit Flow sind
 deaktiviert. Das Backend erwartet Audience `myjudo-api` und validiert Signatur,
 Issuer, Audience und Ablauf über JWKS. Es gibt kein Client Secret in Flutter.
+Der Default Client Scope `basic` ist verpflichtend, weil dessen validierter
+`sub`-Claim die einzige technische Benutzeridentität der API ist. Für bereits
+importierte Realms stellt `scripts/configure-keycloak-client.sh` diesen Scope
+idempotent über die serverseitige Admin API her.
 
 Redirects:
 
