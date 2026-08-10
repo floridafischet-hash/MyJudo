@@ -49,8 +49,7 @@ describe('Keycloak authentication and application RBAC', () => {
     process.env.KEYCLOAK_REALM = 'myjudo';
     process.env.KEYCLOAK_CLIENT_ID = 'myjudo-client';
     process.env.KEYCLOAK_AUDIENCE = 'myjudo-api';
-    process.env.DATABASE_URL ??=
-      'postgresql://myjudo:development-only@127.0.0.1:15432/myjudo';
+    process.env.DATABASE_URL ??= 'postgresql://myjudo:test-password@127.0.0.1:15432/myjudo';
     process.env.APP_ORIGIN ??= 'http://localhost:8080';
     process.env.INITIAL_ORGANIZATION_SLUG ??= 'test-verein';
 
@@ -290,10 +289,13 @@ describe('Keycloak authentication and application RBAC', () => {
     subject: string,
   ): Promise<User> {
     const repository = dataSource.getRepository(User);
-    let user = await repository.findOneBy({ identityProviderSubject: subject });
+    const email = `${username}@example.test`;
+    let user = await repository.findOne({
+      where: [{ identityProviderSubject: subject }, { organizationId, email }],
+    });
     user ??= repository.create({
       organizationId,
-      email: `${username}@example.test`,
+      email,
       identityProviderSubject: subject,
       firstName,
       lastName: 'Test',
@@ -301,6 +303,7 @@ describe('Keycloak authentication and application RBAC', () => {
       approvedAt: new Date(),
       approvedBy: null,
     });
+    user.identityProviderSubject = subject;
     user.firstName = firstName;
     return repository.save(user);
   }
