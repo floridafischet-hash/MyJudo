@@ -27,7 +27,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Allgemein'), findsWidgets);
-    expect(find.text('Willkommen'), findsOneWidget);
+    // The latest message appears in the chat preview and the conversation.
+    expect(find.text('Willkommen'), findsNWidgets(2));
     await tester.enterText(find.byType(TextField), 'Neue Nachricht');
     await tester.tap(find.byTooltip('Senden'));
     await tester.pumpAndSettle();

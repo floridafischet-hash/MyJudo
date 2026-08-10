@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
+import '../chat/chat_page.dart';
 import '../members/member_list_page.dart';
 import '../users/pending_users_page.dart';
 
@@ -45,6 +46,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         final content = _Content(
           index: _selectedIndex,
           accessToken: session?.accessToken,
+          currentUserId: session?.userId,
           permissions: session?.permissions ?? const {},
           greetingName: session?.greetingName ?? '',
         );
@@ -152,11 +154,13 @@ class _Content extends ConsumerWidget {
   const _Content({
     required this.index,
     required this.accessToken,
+    required this.currentUserId,
     required this.permissions,
     required this.greetingName,
   });
   final int index;
   final String? accessToken;
+  final String? currentUserId;
   final Set<String> permissions;
   final String greetingName;
 
@@ -187,6 +191,20 @@ class _Content extends ConsumerWidget {
         const SizedBox(height: 28),
         if (index == 0)
           const _DashboardOverview()
+        else if (index == 2 &&
+            accessToken != null &&
+            currentUserId != null &&
+            permissions.contains('chat.general.access'))
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height - 145,
+            child: Card(
+              clipBehavior: Clip.antiAlias,
+              child: ChatPage(
+                accessToken: accessToken!,
+                currentUserId: currentUserId!,
+              ),
+            ),
+          )
         else if (index == 3 &&
             accessToken != null &&
             (permissions.contains('users.approve') ||
