@@ -71,7 +71,7 @@ void main() {
 
     expect(repository.directorySearch, 'Stefan');
     expect(repository.directParticipantId, 'stefan-id');
-    expect(find.text('Stefan Test'), findsOneWidget);
+    expect(find.text('Stefan Test'), findsNWidgets(2));
   });
 }
 
