@@ -8,6 +8,10 @@ import { Organization } from '../src/organizations/organization.entity';
 import { User } from '../src/users/user.entity';
 import { UserStatus } from '../src/users/user-status.enum';
 import { PasswordService } from '../src/auth/password.service';
+import { MembershipLifecycleService } from '../src/members/membership-lifecycle.service';
+import { Member } from '../src/members/member.entity';
+import { MemberStatus } from '../src/members/member-status.enum';
+import { UserRole } from '../src/rbac/user-role.entity';
 
 describe('administrative user lifecycle', () => {
   jest.setTimeout(30_000);
@@ -43,7 +47,7 @@ describe('administrative user lifecycle', () => {
       .expect(201);
     await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ organizationSlug: 'test-verein', email, password: 'Registration-Test-2026!' })
+      .send({ username: email.split('@')[0], password: 'Registration-Test-2026!' })
       .expect(401);
     const pending = await request(app.getHttpServer())
       .get('/api/v1/users?status=pending')
@@ -107,18 +111,57 @@ describe('administrative user lifecycle', () => {
       .set('Authorization', `Bearer ${refreshedMemberToken}`)
       .expect(403);
 
+    const createdMember = await request(app.getHttpServer())
+      .post('/api/v1/members')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        memberNumber: `M-${Date.now()}`,
+        firstName: 'Test',
+        lastName: 'Mitglied',
+        userId: registration.body.id,
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/members/${createdMember.body.id}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'exit_scheduled', exitDate: '2026-08-15' })
+      .expect(200);
+    const lifecycle = app.get(MembershipLifecycleService);
+    await expect(lifecycle.process(new Date('2026-08-31T12:00:00Z'))).resolves.toBe(0);
+    await expect(lifecycle.process(new Date('2026-09-01T12:00:00Z'))).resolves.toBe(1);
+    await expect(lifecycle.process(new Date('2026-09-02T12:00:00Z'))).resolves.toBe(0);
+    const endedMember = await dataSource
+      .getRepository(Member)
+      .findOneByOrFail({ id: createdMember.body.id });
+    expect(endedMember.status).toBe(MemberStatus.Former);
+    expect(
+      await dataSource
+        .getRepository(UserRole)
+        .countBy({ userId: registration.body.id, roleId: memberRole.id }),
+    ).toBe(0);
+    await request(app.getHttpServer())
+      .get('/api/v1/members')
+      .set('Authorization', `Bearer ${refreshedMemberToken}`)
+      .expect(401);
+
     const audits = await dataSource
       .getRepository(AuditLog)
       .findBy({ entityId: registration.body.id });
     expect(audits.map((entry) => entry.action)).toEqual(
       expect.arrayContaining(['user.registered', 'user.approved', 'user.roles.replaced']),
     );
+    const memberAudits = await dataSource
+      .getRepository(AuditLog)
+      .findBy({ entityId: createdMember.body.id });
+    expect(memberAudits.filter((entry) => entry.action === 'member.exit.completed')).toHaveLength(
+      1,
+    );
   });
 
   async function login(email: string, password: string): Promise<string> {
     const response = await request(app.getHttpServer())
       .post('/api/v1/auth/login')
-      .send({ organizationSlug: 'test-verein', email, password })
+      .send({ username: email.split('@')[0], password })
       .expect(200);
     return response.body.accessToken as string;
   }

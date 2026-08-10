@@ -18,8 +18,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('MyJudo'), findsOneWidget);
-    expect(find.text('Vereinskennung'), findsOneWidget);
-    expect(find.text('E-Mail-Adresse'), findsOneWidget);
+    expect(find.text('Benutzername'), findsOneWidget);
+    expect(find.text('Vereinskennung'), findsNothing);
+    expect(find.text('E-Mail-Adresse'), findsNothing);
     expect(find.widgetWithText(FilledButton, 'Anmelden'), findsOneWidget);
   });
 }

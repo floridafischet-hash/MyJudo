@@ -13,14 +13,12 @@ class LoginPage extends ConsumerStatefulWidget {
 
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _formKey = GlobalKey<FormState>();
-  final _organization = TextEditingController();
-  final _email = TextEditingController();
+  final _username = TextEditingController();
   final _password = TextEditingController();
 
   @override
   void dispose() {
-    _organization.dispose();
-    _email.dispose();
+    _username.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -55,20 +53,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ),
                         const SizedBox(height: 28),
                         TextFormField(
-                          controller: _organization,
+                          controller: _username,
                           decoration: const InputDecoration(
-                            labelText: 'Vereinskennung',
+                            labelText: 'Benutzername',
                           ),
-                          textInputAction: TextInputAction.next,
-                          validator: _required,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _email,
-                          decoration: const InputDecoration(
-                            labelText: 'E-Mail-Adresse',
-                          ),
-                          keyboardType: TextInputType.emailAddress,
                           autofillHints: const [AutofillHints.username],
                           textInputAction: TextInputAction.next,
                           validator: _required,
@@ -127,10 +115,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     ref
         .read(authControllerProvider.notifier)
-        .login(
-          organizationSlug: _organization.text.trim(),
-          email: _email.text.trim(),
-          password: _password.text,
-        );
+        .login(username: _username.text.trim(), password: _password.text);
   }
 }

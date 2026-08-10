@@ -48,18 +48,13 @@ class AuthRepository {
   }
 
   Future<AuthSession> login({
-    required String organizationSlug,
-    required String email,
+    required String username,
     required String password,
   }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/auth/login',
-        data: {
-          'organizationSlug': organizationSlug,
-          'email': email,
-          'password': password,
-        },
+        data: {'username': username, 'password': password},
       );
       final session = AuthSession.fromJson(_requiredBody(response));
       await _persistRefresh(session.refreshToken);

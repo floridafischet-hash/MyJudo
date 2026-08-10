@@ -8,11 +8,22 @@ import { RolePermission } from '../rbac/role-permission.entity';
 import { Role } from '../rbac/role.entity';
 import { UserRole } from '../rbac/user-role.entity';
 import { User } from '../users/user.entity';
+import { Member } from '../members/member.entity';
 
 export default new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [Organization, User, Permission, Role, UserRole, RolePermission, AuditLog, Session],
+  entities: [
+    Organization,
+    User,
+    Permission,
+    Role,
+    UserRole,
+    RolePermission,
+    AuditLog,
+    Session,
+    Member,
+  ],
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
   synchronize: false,
 });

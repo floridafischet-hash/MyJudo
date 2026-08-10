@@ -16,6 +16,8 @@ import { AuthModule } from './auth/auth.module';
 import { RbacModule } from './rbac/rbac.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { UsersModule } from './users/users.module';
+import { Member } from './members/member.entity';
+import { MembersModule } from './members/members.module';
 
 @Module({
   imports: [
@@ -35,6 +37,7 @@ import { UsersModule } from './users/users.module';
           RolePermission,
           AuditLog,
           Session,
+          Member,
         ],
         synchronize: false,
         migrationsRun: false,
@@ -44,6 +47,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     RbacModule,
     UsersModule,
+    MembersModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

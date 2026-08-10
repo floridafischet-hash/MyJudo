@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
 import '../users/pending_users_page.dart';
+import '../members/member_list_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -141,17 +142,29 @@ class _Content extends ConsumerWidget {
             ],
           )
         else if (index == 3 &&
-            permissions.contains('users.approve') &&
-            accessToken != null) ...[
-          Text(
-            'Ausstehende Registrierungen',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 420,
-            child: PendingUsersPage(accessToken: accessToken!),
-          ),
+            accessToken != null &&
+            (permissions.contains('users.approve') ||
+                permissions.contains('members.view'))) ...[
+          if (permissions.contains('members.view')) ...[
+            Text('Mitglieder', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 360,
+              child: MemberListPage(accessToken: accessToken!),
+            ),
+          ],
+          if (permissions.contains('users.approve')) ...[
+            const SizedBox(height: 24),
+            Text(
+              'Ausstehende Registrierungen',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 360,
+              child: PendingUsersPage(accessToken: accessToken!),
+            ),
+          ],
         ] else if (index == 4)
           Align(
             alignment: Alignment.centerLeft,

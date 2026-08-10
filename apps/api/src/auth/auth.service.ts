@@ -84,15 +84,23 @@ export class AuthService {
     context: { userAgent?: string; ipAddress?: string },
   ): Promise<TokenPair> {
     const organization = await this.organizations.findOneBy({
-      slug: dto.organizationSlug,
+      slug: this.config.getOrThrow<string>('INITIAL_ORGANIZATION_SLUG'),
       active: true,
     });
-    const user = organization
-      ? await this.users.findOneBy({
-          organizationId: organization.id,
-          email: normalizeEmail(dto.email),
-        })
-      : null;
+    const users = organization
+      ? await this.users
+          .createQueryBuilder('user')
+          .where('"user"."organizationId" = :organizationId', {
+            organizationId: organization.id,
+          })
+          .andWhere('"user"."deletedAt" IS NULL')
+          .andWhere("lower(split_part(user.email, '@', 1)) = :username", {
+            username: dto.username.trim().toLocaleLowerCase('en-US'),
+          })
+          .take(2)
+          .getMany()
+      : [];
+    const user = users.length === 1 ? users[0] : null;
     if (!user || !(await this.passwords.verify(user.passwordHash, dto.password))) {
       throw new UnauthorizedException('Anmeldung fehlgeschlagen.');
     }

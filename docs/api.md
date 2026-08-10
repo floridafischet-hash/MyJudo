@@ -13,6 +13,9 @@ Basispräfix: `/api/v1`
 | `PATCH` | `/users/{id}/approve` | `users.approve` | Benutzer freigeben und auditieren |
 | `PUT` | `/users/{id}/roles` | `roles.manage` | Rollen vollständig und transaktional ersetzen |
 | `GET` | `/roles` | `roles.manage` | Rollen des eigenen Vereins auflisten |
+| `GET` | `/members` | `members.view` | Mitglieder des eigenen Vereins auflisten |
+| `POST` | `/members` | `members.create` | Mitglied anlegen |
+| `PATCH` | `/members/{id}/status` | `members.status.change` | Status oder Austrittsvormerkung ändern |
 
 Validierungsfehler liefern HTTP 400, doppelte Registrierungen HTTP 409 und
 fehlgeschlagene beziehungsweise noch nicht freigegebene Anmeldungen HTTP 401.
