@@ -42,7 +42,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: AccessTokenPayload): Promise<AuthenticatedUser> {
-    let user = await this.users.findOneBy({ identityProviderSubject: payload.sub });
+    const subject = payload.sub?.trim();
+    if (!subject || !UUID_PATTERN.test(subject)) throw new UnauthorizedException();
+    let user = await this.users.findOneBy({ identityProviderSubject: subject });
     if (!user) user = await this.provisionPendingUser(payload);
     if (user.status === UserStatus.Suspended || user.status === UserStatus.Archived) {
       throw new UnauthorizedException();
@@ -53,7 +55,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       id: user.id,
       organizationId: user.organizationId,
       authorizationVersion: user.authorizationVersion,
-      identityProviderSubject: payload.sub,
+      identityProviderSubject: subject,
       identityRoles: [...roles],
     };
   }
@@ -104,6 +106,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
   }
 }
+
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 interface JwkResponse {
   keys: Array<JsonWebKey & { kid?: string; use?: string }>;

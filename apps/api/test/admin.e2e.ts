@@ -1,4 +1,4 @@
-import { generateKeyPairSync, KeyObject } from 'node:crypto';
+import { generateKeyPairSync, KeyObject, randomUUID } from 'node:crypto';
 import { createServer, Server } from 'node:http';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -65,6 +65,7 @@ describe('Keycloak authentication and application RBAC', () => {
     const organization = await dataSource
       .getRepository(Organization)
       .findOneByOrFail({ slug: 'test-verein' });
+    await resetOrganizationTestData(organization.id);
     florian = await ensureUser(organization.id, 'florian', 'Florian', florianSubject);
     stefan = await ensureUser(organization.id, 'stefan', 'Stefan', stefanSubject);
     member = await ensureUser(organization.id, 'mitglied', '', memberSubject);
@@ -122,6 +123,13 @@ describe('Keycloak authentication and application RBAC', () => {
       issueToken(florianSubject, ['superuser'], { expiresIn: -1 }),
       issueToken(florianSubject, ['superuser'], { issuer: 'https://wrong.example/realms/myjudo' }),
       issueToken(florianSubject, ['superuser'], { audience: 'wrong-audience' }),
+      sign({ realm_access: { roles: ['superuser'] } }, privateKey, {
+        algorithm: 'RS256',
+        keyid: keyId,
+        issuer,
+        audience: 'myjudo-api',
+        expiresIn: 300,
+      }),
       'not-a-jwt',
     ]) {
       await request(app.getHttpServer())
@@ -258,7 +266,7 @@ describe('Keycloak authentication and application RBAC', () => {
     const foreignUser = await dataSource.getRepository(User).save({
       organizationId: foreignOrganization.id,
       email: `foreign-${Date.now()}@example.test`,
-      identityProviderSubject: '00000000-0000-0000-0000-000000000099',
+      identityProviderSubject: randomUUID(),
       firstName: 'Fremd',
       lastName: 'Benutzer',
       status: UserStatus.Approved,
@@ -306,6 +314,23 @@ describe('Keycloak authentication and application RBAC', () => {
     user.identityProviderSubject = subject;
     user.firstName = firstName;
     return repository.save(user);
+  }
+
+  async function resetOrganizationTestData(organizationId: string): Promise<void> {
+    await dataSource.transaction(async (manager) => {
+      await manager.delete(AuditLog, { organizationId });
+      await manager.delete(Invitation, { organizationId });
+      await manager.delete(Member, { organizationId });
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from(UserRole)
+        .where('"userId" IN (SELECT id FROM users WHERE "organizationId" = :organizationId)', {
+          organizationId,
+        })
+        .execute();
+      await manager.delete(User, { organizationId });
+    });
   }
 
   function issueToken(
