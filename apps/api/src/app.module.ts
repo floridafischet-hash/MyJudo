@@ -24,6 +24,10 @@ import { ChatParticipant } from './chat/chat-participant.entity';
 import { Message } from './chat/message.entity';
 import { ChatModule } from './chat/chat.module';
 import { Session } from './auth/session.entity';
+import { Poll } from './polls/poll.entity';
+import { PollOption } from './polls/poll-option.entity';
+import { PollVote } from './polls/poll-vote.entity';
+import { PollsModule } from './polls/polls.module';
 
 @Module({
   imports: [
@@ -48,6 +52,9 @@ import { Session } from './auth/session.entity';
           ChatParticipant,
           Message,
           Session,
+          Poll,
+          PollOption,
+          PollVote,
         ],
         synchronize: false,
         migrationsRun: false,
@@ -60,6 +67,7 @@ import { Session } from './auth/session.entity';
     MembersModule,
     InvitationsModule,
     ChatModule,
+    PollsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -17,6 +17,16 @@ zwingend auf die Organisation aus dem authentifizierten Benutzerkontext begrenzt
 PostgreSQL ist die führende Datenhaltung. Schemaänderungen erfolgen nur über
 versionierte TypeORM-Migrationen; automatisches `synchronize` ist deaktiviert.
 
+## Umfragen
+
+`polls`, `poll_options` und `poll_votes` sind mandantenbezogen. Ein eindeutiger
+Constraint auf `(pollId, userId)` erzwingt genau eine Stimme je Benutzer und
+Umfrage; erneute Abstimmungen aktualisieren diese Zeile atomar. Optionen sind
+positionsstabil und gehören per Fremdschlüssel zur Umfrage. Beginn und Ende
+werden als `timestamptz` gespeichert und zusätzlich durch einen Datenbank-Check
+auf eine gültige Reihenfolge begrenzt. Zielgruppen werden bei jeder Lese- und
+Schreiboperation anhand der aktuellen Permission geprüft.
+
 ## Mitgliedschaft
 
 `members` ist mandantenbezogen und optional mit einem Benutzerkonto verknüpft.

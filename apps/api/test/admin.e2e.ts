@@ -9,6 +9,7 @@ import { Chat, ChatType } from '../src/chat/chat.entity';
 import { Invitation } from '../src/invitations/invitation.entity';
 import { Member } from '../src/members/member.entity';
 import { Organization } from '../src/organizations/organization.entity';
+import { PollVote } from '../src/polls/poll-vote.entity';
 import { Role } from '../src/rbac/role.entity';
 import { UserRole } from '../src/rbac/user-role.entity';
 import { User } from '../src/users/user.entity';
@@ -21,9 +22,11 @@ describe('Local authentication and application RBAC', () => {
   let florian: User;
   let stefan: User;
   let member: User;
+  let unprivileged: User;
   let adminToken: string;
   let stefanToken: string;
   let memberToken: string;
+  let unprivilegedToken: string;
   const pepper = 'test-password-pepper';
   const suffix = Date.now().toString(36);
   const usernames = {
@@ -53,6 +56,7 @@ describe('Local authentication and application RBAC', () => {
     florian = await createUser(usernames.florian, 'Florian', 'correct-password');
     stefan = await createUser(usernames.stefan, 'Stefan', 'stefan-password');
     member = await createUser(usernames.member, 'Mina', 'member-password');
+    unprivileged = await createUser(`ohne-rolle-${suffix}`, 'Ohne Rolle', 'unused-password');
     const superuser = await dataSource
       .getRepository(Role)
       .findOneByOrFail({ organizationId: organization.id, name: 'Superuser' });
@@ -69,7 +73,7 @@ describe('Local authentication and application RBAC', () => {
       .save({ userId: member.id, roleId: memberRole.id, assignedBy: florian.id });
     const jwt = app.get(JwtService);
     const tokens = await Promise.all(
-      [florian, stefan, member].map((user) =>
+      [florian, stefan, member, unprivileged].map((user) =>
         jwt.signAsync(
           { sub: user.id, org: user.organizationId, av: user.authorizationVersion },
           {
@@ -84,6 +88,7 @@ describe('Local authentication and application RBAC', () => {
     adminToken = tokens[0]!;
     stefanToken = tokens[1]!;
     memberToken = tokens[2]!;
+    unprivilegedToken = tokens[3]!;
   });
 
   afterAll(async () => {
@@ -254,6 +259,140 @@ describe('Local authentication and application RBAC', () => {
       .get(`/api/v1/chats/${psgChat.id}/messages`)
       .set('Authorization', `Bearer ${memberToken}`)
       .expect(404);
+  });
+
+  it('creates attendance polls, changes a vote and hides restricted results', async () => {
+    const now = Date.now();
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/polls')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        type: 'attendance',
+        title: 'Sommertraining',
+        description: 'Teilnahme am Training',
+        startsAt: new Date(now - 60_000).toISOString(),
+        endsAt: new Date(now + 3_600_000).toISOString(),
+        resultsVisibleToParticipants: false,
+      })
+      .expect(201);
+    expect(created.body.options.map((option: { label: string }) => option.label)).toEqual([
+      'Ja',
+      'Nein',
+      'Vielleicht',
+    ]);
+    const yes = created.body.options[0].id as string;
+    const no = created.body.options[1].id as string;
+    const firstVote = await request(app.getHttpServer())
+      .post(`/api/v1/polls/${created.body.id}/vote`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ optionId: yes })
+      .expect(201);
+    expect(firstVote.body).toEqual(
+      expect.objectContaining({ selectedOptionId: yes, canViewResults: false, totalVotes: null }),
+    );
+    await request(app.getHttpServer())
+      .post(`/api/v1/polls/${created.body.id}/vote`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ optionId: no })
+      .expect(201)
+      .expect(({ body }) => expect(body.selectedOptionId).toBe(no));
+    expect(
+      await dataSource.getRepository(PollVote).countBy({
+        pollId: created.body.id as string,
+        userId: member.id,
+      }),
+    ).toBe(1);
+    const result = await request(app.getHttpServer())
+      .get(`/api/v1/polls/${created.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(result.body.totalVotes).toBe(1);
+    expect(result.body.options).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: no, voteCount: 1 })]),
+    );
+  });
+
+  it('enforces poll windows, target permissions and a single vote under concurrency', async () => {
+    const now = Date.now();
+    await request(app.getHttpServer())
+      .post('/api/v1/polls')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({
+        type: 'attendance',
+        title: 'Nicht erlaubt',
+        startsAt: new Date(now - 60_000).toISOString(),
+        endsAt: new Date(now + 60_000).toISOString(),
+        resultsVisibleToParticipants: false,
+      })
+      .expect(403);
+    const restricted = await request(app.getHttpServer())
+      .post('/api/v1/polls')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        type: 'choice',
+        title: 'Vorstandstermin',
+        startsAt: new Date(now - 60_000).toISOString(),
+        endsAt: new Date(now + 3_600_000).toISOString(),
+        requiredPermission: 'chat.board.access',
+        resultsVisibleToParticipants: true,
+        options: ['Montag', 'Dienstag'],
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .get(`/api/v1/polls/${restricted.body.id}`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(404);
+
+    const open = await request(app.getHttpServer())
+      .post('/api/v1/polls')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        type: 'choice',
+        title: 'Paralleltest',
+        startsAt: new Date(now - 60_000).toISOString(),
+        endsAt: new Date(now + 3_600_000).toISOString(),
+        resultsVisibleToParticipants: true,
+        options: ['A', 'B'],
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/polls/${open.body.id}/vote`)
+      .set('Authorization', `Bearer ${unprivilegedToken}`)
+      .send({ optionId: open.body.options[0].id })
+      .expect(403);
+    await Promise.all(
+      open.body.options.map((option: { id: string }) =>
+        request(app.getHttpServer())
+          .post(`/api/v1/polls/${open.body.id}/vote`)
+          .set('Authorization', `Bearer ${memberToken}`)
+          .send({ optionId: option.id })
+          .expect(201),
+      ),
+    );
+    expect(
+      await dataSource.getRepository(PollVote).countBy({
+        pollId: open.body.id as string,
+        userId: member.id,
+      }),
+    ).toBe(1);
+
+    const closed = await request(app.getHttpServer())
+      .post('/api/v1/polls')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        type: 'choice',
+        title: 'Geschlossen',
+        startsAt: new Date(now - 120_000).toISOString(),
+        endsAt: new Date(now - 60_000).toISOString(),
+        resultsVisibleToParticipants: true,
+        options: ['A', 'B'],
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/polls/${closed.body.id}/vote`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ optionId: closed.body.options[0].id })
+      .expect(400);
   });
 
   async function createUser(username: string, firstName: string, password: string): Promise<User> {

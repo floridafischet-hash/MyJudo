@@ -29,6 +29,10 @@ Basispräfix: `/api/v1`
 | `GET` | `/chats/{id}/messages` | aktuelle Chatberechtigung | Nachrichten cursorbasiert laden |
 | `POST` | `/chats/{id}/messages` | aktuelle Chatberechtigung | Textnachricht persistent senden |
 | `POST` | `/chats/{id}/read` | aktuelle Chatberechtigung | Lesestand aktualisieren |
+| `GET` | `/polls` | `polls.vote` + Zielgruppe | Sichtbare Umfragen und eigene Stimme laden |
+| `GET` | `/polls/{id}` | `polls.vote` + Zielgruppe | Umfrage mit erlaubter Ergebnissicht laden |
+| `POST` | `/polls` | `polls.create` | Teilnahme- oder Auswahlumfrage erstellen |
+| `POST` | `/polls/{id}/vote` | `polls.vote` + Zielgruppe | Stimme atomar erstellen oder ändern |
 
 Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
 Ungültige oder abgelaufene Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/auth_controller.dart';
 import '../chat/chat_page.dart';
 import '../members/member_list_page.dart';
+import '../polls/poll_page.dart';
 import '../users/pending_users_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
@@ -199,9 +200,40 @@ class _Content extends ConsumerWidget {
             height: MediaQuery.sizeOf(context).height - 145,
             child: Card(
               clipBehavior: Clip.antiAlias,
-              child: ChatPage(
-                accessToken: accessToken!,
-                currentUserId: currentUserId!,
+              child: DefaultTabController(
+                length: permissions.contains('polls.vote') ? 2 : 1,
+                child: Column(
+                  children: [
+                    TabBar(
+                      tabs: [
+                        const Tab(
+                          icon: Icon(Icons.forum_outlined),
+                          text: 'Chat',
+                        ),
+                        if (permissions.contains('polls.vote'))
+                          const Tab(
+                            icon: Icon(Icons.poll_outlined),
+                            text: 'Umfragen',
+                          ),
+                      ],
+                    ),
+                    Expanded(
+                      child: TabBarView(
+                        children: [
+                          ChatPage(
+                            accessToken: accessToken!,
+                            currentUserId: currentUserId!,
+                          ),
+                          if (permissions.contains('polls.vote'))
+                            PollPage(
+                              accessToken: accessToken!,
+                              permissions: permissions,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           )

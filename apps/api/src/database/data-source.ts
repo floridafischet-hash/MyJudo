@@ -13,6 +13,9 @@ import { Chat } from '../chat/chat.entity';
 import { ChatParticipant } from '../chat/chat-participant.entity';
 import { Message } from '../chat/message.entity';
 import { Session } from '../auth/session.entity';
+import { Poll } from '../polls/poll.entity';
+import { PollOption } from '../polls/poll-option.entity';
+import { PollVote } from '../polls/poll-vote.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -31,6 +34,9 @@ export default new DataSource({
     ChatParticipant,
     Message,
     Session,
+    Poll,
+    PollOption,
+    PollVote,
   ],
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
   synchronize: false,
