@@ -2,8 +2,7 @@ SELECT
   u.email,
   u."firstName",
   u.status,
-  r.name AS role,
-  u."identityProviderSubject" AS identity_subject
+  r.name AS role
 FROM users u
 JOIN user_roles ur ON ur."userId" = u.id
 JOIN roles r ON r.id = ur."roleId"

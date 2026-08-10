@@ -26,15 +26,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://myjudo:test-password@127.0.0.1:5432/myjudo
       APP_ORIGIN: https://localhost:18780
-      KEYCLOAK_URL: http://127.0.0.1:9999
-      KEYCLOAK_JWKS_URL: http://127.0.0.1:9999
-      KEYCLOAK_REALM: myjudo
-      KEYCLOAK_CLIENT_ID: myjudo-client
-      KEYCLOAK_AUDIENCE: myjudo-api
+      JWT_ACCESS_SECRET: ci-only-secret-with-at-least-32-characters
+      JWT_ACCESS_TTL: 15m
+      PASSWORD_PEPPER: ci-only-password-pepper
       INITIAL_ORGANIZATION_SLUG: test-verein
       INITIAL_ORGANIZATION_NAME: Test Verein
       INITIAL_ADMIN_EMAIL: admin@example.test
-      INITIAL_ADMIN_KEYCLOAK_SUBJECT: 00000000-0000-0000-0000-000000000001
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
