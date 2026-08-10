@@ -44,7 +44,7 @@ class ChatRepository {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/chats/$chatId/messages',
-        queryParameters: {'before': ?before, 'limit': 50},
+        queryParameters: {'before': before, 'limit': 50},
       );
       return MessagePage.fromJson(response.data ?? const {});
     } on DioException catch (error) {

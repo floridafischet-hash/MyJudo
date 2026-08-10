@@ -51,7 +51,9 @@ class _ChatPageState extends State<ChatPage> {
     _refreshTimer?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
-    if (widget.repository == null) _repository.dispose();
+    if (widget.repository == null) {
+      _repository.dispose();
+    }
     super.dispose();
   }
 
