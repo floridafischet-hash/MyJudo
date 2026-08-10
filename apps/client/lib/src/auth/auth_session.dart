@@ -32,7 +32,9 @@ class AuthSession {
     accessToken: json['accessToken'] as String,
     refreshToken: json['refreshToken'] as String,
     expiresIn: (json['expiresIn'] as num).toInt(),
-    permissions: ((json['permissions'] as List<dynamic>?) ?? const []).whereType<String>().toSet(),
+    permissions: ((json['permissions'] as List<dynamic>?) ?? const [])
+        .whereType<String>()
+        .toSet(),
     username: json['username'] as String,
     firstName: json['firstName'] as String?,
     displayName: json['displayName'] as String?,

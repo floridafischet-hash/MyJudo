@@ -30,7 +30,15 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Scaffold(
       body: Stack(
         children: [
-          Positioned(right: -90, top: -100, child: _Sun(color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.10))),
+          Positioned(
+            right: -90,
+            top: -100,
+            child: _Sun(
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.10),
+            ),
+          ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -45,13 +53,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            Text('MyJudo', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700)),
+                            Text(
+                              'MyJudo',
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
+                            ),
                             const SizedBox(height: 8),
-                            Text('Willkommen zurück', style: Theme.of(context).textTheme.bodyLarge),
+                            Text(
+                              'Willkommen zurück',
+                              style: Theme.of(context).textTheme.bodyLarge,
+                            ),
                             const SizedBox(height: 28),
                             TextFormField(
                               controller: _username,
-                              decoration: const InputDecoration(labelText: 'Benutzername', prefixIcon: Icon(Icons.person_outline)),
+                              decoration: const InputDecoration(
+                                labelText: 'Benutzername',
+                                prefixIcon: Icon(Icons.person_outline),
+                              ),
                               autofillHints: const [AutofillHints.username],
                               textInputAction: TextInputAction.next,
                               validator: _required,
@@ -59,7 +77,10 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             const SizedBox(height: 16),
                             TextFormField(
                               controller: _password,
-                              decoration: const InputDecoration(labelText: 'Passwort', prefixIcon: Icon(Icons.lock_outline)),
+                              decoration: const InputDecoration(
+                                labelText: 'Passwort',
+                                prefixIcon: Icon(Icons.lock_outline),
+                              ),
                               obscureText: true,
                               autofillHints: const [AutofillHints.password],
                               onFieldSubmitted: (_) => _submit(),
@@ -67,15 +88,31 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                             ),
                             if (error != null) ...[
                               const SizedBox(height: 16),
-                              Semantics(liveRegion: true, child: Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error))),
+                              Semantics(
+                                liveRegion: true,
+                                child: Text(
+                                  error,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
+                              ),
                             ],
                             const SizedBox(height: 24),
                             FilledButton.icon(
                               onPressed: auth.isLoading ? null : _submit,
                               icon: auth.isLoading
-                                  ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
                                   : const Icon(Icons.login),
-                              label: const Padding(padding: EdgeInsets.symmetric(vertical: 13), child: Text('Anmelden')),
+                              label: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 13),
+                                child: Text('Anmelden'),
+                              ),
                             ),
                           ],
                         ),
@@ -91,11 +128,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     );
   }
 
-  String? _required(String? value) => value == null || value.trim().isEmpty ? 'Pflichtfeld' : null;
+  String? _required(String? value) =>
+      value == null || value.trim().isEmpty ? 'Pflichtfeld' : null;
 
   void _submit() {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    ref.read(authControllerProvider.notifier).login(username: _username.text.trim(), password: _password.text);
+    ref
+        .read(authControllerProvider.notifier)
+        .login(username: _username.text.trim(), password: _password.text);
   }
 }
 
@@ -103,5 +143,9 @@ class _Sun extends StatelessWidget {
   const _Sun({required this.color});
   final Color color;
   @override
-  Widget build(BuildContext context) => Container(width: 280, height: 280, decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+  Widget build(BuildContext context) => Container(
+    width: 280,
+    height: 280,
+    decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+  );
 }

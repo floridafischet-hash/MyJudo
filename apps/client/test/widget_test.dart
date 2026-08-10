@@ -6,9 +6,7 @@ import 'package:myjudo_client/src/auth/auth_controller.dart';
 import 'package:myjudo_client/src/auth/auth_session.dart';
 
 void main() {
-  testWidgets('shows the local login when no session exists', (
-    tester,
-  ) async {
+  testWidgets('shows the local login when no session exists', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
