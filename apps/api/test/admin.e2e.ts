@@ -121,6 +121,34 @@ describe('administrative user lifecycle', () => {
         userId: registration.body.id,
       })
       .expect(201);
+    const csvExport = await request(app.getHttpServer())
+      .get('/api/v1/members/export.csv')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect('Content-Type', /text\/csv/)
+      .expect(200);
+    expect(csvExport.text.startsWith('\uFEFF')).toBe(true);
+    expect(csvExport.text).toContain('Mitgliedsnummer');
+    expect(csvExport.text).toContain(createdMember.body.memberNumber as string);
+    const xlsxExport = await request(app.getHttpServer())
+      .get('/api/v1/members/export.xlsx')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .buffer(true)
+      .parse((response, callback) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => callback(null, Buffer.concat(chunks)));
+      })
+      .expect('Content-Type', /spreadsheetml/)
+      .expect(200);
+    expect(
+      Buffer.from(xlsxExport.body as Uint8Array)
+        .subarray(0, 2)
+        .toString(),
+    ).toBe('PK');
+    await request(app.getHttpServer())
+      .get('/api/v1/members/export.csv')
+      .set('Authorization', `Bearer ${refreshedMemberToken}`)
+      .expect(403);
     await request(app.getHttpServer())
       .patch(`/api/v1/members/${createdMember.body.id}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
@@ -156,6 +184,12 @@ describe('administrative user lifecycle', () => {
     expect(memberAudits.filter((entry) => entry.action === 'member.exit.completed')).toHaveLength(
       1,
     );
+    expect(
+      await dataSource.getRepository(AuditLog).countBy({
+        organizationId: endedMember.organizationId,
+        action: 'members.exported',
+      }),
+    ).toBe(2);
   });
 
   async function login(email: string, password: string): Promise<string> {

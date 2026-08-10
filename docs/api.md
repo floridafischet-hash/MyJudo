@@ -16,6 +16,8 @@ Basispräfix: `/api/v1`
 | `GET` | `/members` | `members.view` | Mitglieder des eigenen Vereins auflisten |
 | `POST` | `/members` | `members.create` | Mitglied anlegen |
 | `PATCH` | `/members/{id}/status` | `members.status.change` | Status oder Austrittsvormerkung ändern |
+| `GET` | `/members/export.csv` | `members.export` | UTF-8-CSV exportieren und auditieren |
+| `GET` | `/members/export.xlsx` | `members.export` | XLSX exportieren und auditieren |
 
 Validierungsfehler liefern HTTP 400, doppelte Registrierungen HTTP 409 und
 fehlgeschlagene beziehungsweise noch nicht freigegebene Anmeldungen HTTP 401.
