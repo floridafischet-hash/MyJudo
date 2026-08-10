@@ -20,6 +20,8 @@ import { RequirePermissions } from '../rbac/permissions.decorator';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { UserStatus } from './user-status.enum';
 import { UsersService, UserSummary } from './users.service';
+import { ListUserDirectoryDto } from './dto/list-user-directory.dto';
+import { DirectoryUser } from './users.service';
 
 interface UserRequest {
   user: AuthenticatedUser;
@@ -39,6 +41,15 @@ export class UsersController {
     @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
   ): Promise<UserSummary[]> {
     return this.users.listByStatus(request.user, status, Math.min(Math.max(limit, 1), 100));
+  }
+
+  @Get('directory')
+  @RequirePermissions('chat.general.access')
+  directory(
+    @Req() request: UserRequest,
+    @Query() query: ListUserDirectoryDto,
+  ): Promise<{ items: DirectoryUser[]; page: number; pageSize: number; total: number }> {
+    return this.users.directory(request.user, query);
   }
 
   @Patch(':id/approve')

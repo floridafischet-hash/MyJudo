@@ -11,7 +11,8 @@ Backend-Fundament, einen echten Flutter-Login, permission-gesteuerte
 Benutzerfreigabe sowie eine angebundene Mitgliederliste mit Suche, Pagination,
 Detailbearbeitung, Statuswechseln und automatischer Austrittsverarbeitung.
 Das Chat-Fundament umfasst geschützte Gruppen, Direktnachrichten, persistente
-Lesestände und eine responsive Flutter-Oberfläche. Dateianhänge, Push, Umfragen,
+Lesestände, eine datensparsame Personensuche und eine responsive Flutter-Oberfläche.
+Dateianhänge, Push, Umfragen,
 Kalender, Prüfungen und weitere Fachmodule sind noch nicht fertig.
 
 ## Architektur

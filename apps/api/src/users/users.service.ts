@@ -7,6 +7,7 @@ import { Role } from '../rbac/role.entity';
 import { UserRole } from '../rbac/user-role.entity';
 import { User } from './user.entity';
 import { UserStatus } from './user-status.enum';
+import { ListUserDirectoryDto } from './dto/list-user-directory.dto';
 
 export interface UserSummary {
   id: string;
@@ -15,6 +16,11 @@ export interface UserSummary {
   lastName: string;
   status: UserStatus;
   createdAt: Date;
+}
+
+export interface DirectoryUser {
+  id: string;
+  displayName: string;
 }
 
 @Injectable()
@@ -35,6 +41,39 @@ export class UsersService {
       take: limit,
     });
     return users.map(toSummary);
+  }
+
+  async directory(
+    actor: AuthenticatedUser,
+    query: ListUserDirectoryDto,
+  ): Promise<{ items: DirectoryUser[]; page: number; pageSize: number; total: number }> {
+    const builder = this.users
+      .createQueryBuilder('user')
+      .where('user."organizationId" = :organizationId', {
+        organizationId: actor.organizationId,
+      })
+      .andWhere('user.status = :status', { status: UserStatus.Approved })
+      .andWhere('user.id <> :actorId', { actorId: actor.id })
+      .andWhere('user."deletedAt" IS NULL');
+    if (query.search) {
+      builder.andWhere(
+        `(user."firstName" ILIKE :search OR user."lastName" ILIKE :search OR CONCAT(user."firstName", ' ', user."lastName") ILIKE :search)`,
+        { search: `%${escapeLike(query.search.trim())}%` },
+      );
+    }
+    builder
+      .orderBy('user."lastName"', 'ASC')
+      .addOrderBy('user."firstName"', 'ASC')
+      .addOrderBy('user.id', 'ASC')
+      .skip((query.page - 1) * query.pageSize)
+      .take(query.pageSize);
+    const [users, total] = await builder.getManyAndCount();
+    return {
+      items: users.map((user) => ({ id: user.id, displayName: displayName(user) })),
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+    };
   }
 
   async approve(actor: AuthenticatedUser, userId: string): Promise<UserSummary> {
@@ -124,4 +163,13 @@ function toSummary(user: User): UserSummary {
     status: user.status,
     createdAt: user.createdAt,
   };
+}
+
+function displayName(user: User): string {
+  const name = `${user.firstName} ${user.lastName}`.trim();
+  return name || 'Mitglied';
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 }

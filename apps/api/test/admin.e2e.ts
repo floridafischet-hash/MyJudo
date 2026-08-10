@@ -295,6 +295,25 @@ describe('Keycloak authentication and application RBAC', () => {
     const memberToken = issueToken(memberSubject, []);
     const stefanToken = issueToken(stefanSubject, ['superuser']);
     const florianToken = issueToken(florianSubject, ['superuser']);
+    await dataSource.getRepository(User).save({
+      organizationId: member.organizationId,
+      email: `pending-directory-${Date.now()}@example.test`,
+      identityProviderSubject: randomUUID(),
+      firstName: 'StefanPending',
+      lastName: 'Unsichtbar',
+      status: UserStatus.Pending,
+      approvedAt: null,
+      approvedBy: null,
+    });
+    await request(app.getHttpServer())
+      .get('/api/v1/users/directory?search=Stefan')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.total).toBe(1);
+        expect(body.items).toEqual([{ id: stefan.id, displayName: 'Stefan Test' }]);
+        expect(JSON.stringify(body)).not.toContain('email');
+      });
     const direct = await request(app.getHttpServer())
       .post('/api/v1/chats/direct')
       .set('Authorization', `Bearer ${memberToken}`)

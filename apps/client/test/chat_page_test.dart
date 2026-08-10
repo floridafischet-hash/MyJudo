@@ -37,6 +37,42 @@ void main() {
     expect(find.text('Neue Nachricht'), findsOneWidget);
     expect(repository.markedRead, 1);
   });
+
+  testWidgets('searches an approved user and opens a direct chat', (
+    tester,
+  ) async {
+    final repository = _FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 700,
+            child: ChatPage(
+              accessToken: 'test-token',
+              currentUserId: 'current-user',
+              repository: repository,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Neue Direktnachricht'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Freigegebene Person suchen'),
+      'Stefan',
+    );
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stefan Test'));
+    await tester.pumpAndSettle();
+
+    expect(repository.directorySearch, 'Stefan');
+    expect(repository.directParticipantId, 'stefan-id');
+    expect(find.text('Stefan Test'), findsOneWidget);
+  });
 }
 
 class _FakeChatRepository extends ChatRepository {
@@ -44,6 +80,8 @@ class _FakeChatRepository extends ChatRepository {
 
   String? sentText;
   int markedRead = 0;
+  String? directorySearch;
+  String? directParticipantId;
 
   @override
   Future<List<ChatSummary>> listChats() async => [
@@ -80,6 +118,26 @@ class _FakeChatRepository extends ChatRepository {
   @override
   Future<void> markRead(String chatId) async {
     markedRead += 1;
+  }
+
+  @override
+  Future<DirectoryPage> searchUsers(String search) async {
+    directorySearch = search;
+    return const DirectoryPage(
+      items: [DirectoryUser(id: 'stefan-id', displayName: 'Stefan Test')],
+      total: 1,
+    );
+  }
+
+  @override
+  Future<ChatSummary> createDirect(String participantUserId) async {
+    directParticipantId = participantUserId;
+    return const ChatSummary(
+      id: 'direct-chat',
+      type: ChatType.direct,
+      title: 'Stefan Test',
+      unreadCount: 0,
+    );
   }
 
   @override

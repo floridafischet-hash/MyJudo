@@ -70,3 +70,30 @@ class MessagePage {
   final List<ChatMessage> items;
   final String? nextBefore;
 }
+
+class DirectoryUser {
+  const DirectoryUser({required this.id, required this.displayName});
+
+  factory DirectoryUser.fromJson(Map<String, dynamic> json) => DirectoryUser(
+    id: json['id'] as String,
+    displayName: json['displayName'] as String,
+  );
+
+  final String id;
+  final String displayName;
+}
+
+class DirectoryPage {
+  const DirectoryPage({required this.items, required this.total});
+
+  factory DirectoryPage.fromJson(Map<String, dynamic> json) => DirectoryPage(
+    items: (json['items'] as List<dynamic>? ?? const [])
+        .whereType<Map<String, dynamic>>()
+        .map(DirectoryUser.fromJson)
+        .toList(),
+    total: json['total'] as int? ?? 0,
+  );
+
+  final List<DirectoryUser> items;
+  final int total;
+}

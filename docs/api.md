@@ -9,6 +9,7 @@ Basispräfix: `/api/v1`
 | `GET` | `/users?status=pending` | `users.approve` | Ausstehende Benutzer des eigenen Vereins |
 | `PATCH` | `/users/{id}/approve` | `users.approve` | Benutzer freigeben und auditieren |
 | `PUT` | `/users/{id}/roles` | `roles.manage` | Rollen transaktional ersetzen |
+| `GET` | `/users/directory` | `chat.general.access` | Freigegebene Personen datensparsam suchen |
 | `GET` | `/roles` | `roles.manage` | Rollen des eigenen Vereins auflisten |
 | `GET` | `/members` | `members.view` | Suche, Filter, Sortierung und Pagination |
 | `POST` | `/members` | `members.create` | Mitglied anlegen |

@@ -40,6 +40,30 @@ class ChatRepository {
     }
   }
 
+  Future<DirectoryPage> searchUsers(String search) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        '/users/directory',
+        queryParameters: {'search': search.trim(), 'pageSize': 20},
+      );
+      return DirectoryPage.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<ChatSummary> createDirect(String participantUserId) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/chats/direct',
+        data: {'participantUserId': participantUserId},
+      );
+      return ChatSummary.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
   Future<MessagePage> listMessages(String chatId, {String? before}) async {
     try {
       final response = await _dio.get<Map<String, dynamic>>(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'chat_models.dart';
 import 'chat_repository.dart';
+import 'direct_chat_dialog.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -146,6 +147,17 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<void> _newDirectChat() async {
+    final chat = await showDialog<ChatSummary>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => DirectChatDialog(repository: _repository),
+    );
+    if (chat == null || !mounted) return;
+    await _loadChats(silent: true);
+    if (mounted) await _loadMessages(chat);
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -163,9 +175,6 @@ class _ChatPageState extends State<ChatPage> {
     if (_loadingChats) return const Center(child: CircularProgressIndicator());
     if (_error != null && _chats.isEmpty) {
       return _ErrorView(message: _error!, onRetry: _loadChats);
-    }
-    if (_chats.isEmpty) {
-      return const Center(child: Text('Keine freigegebenen Chats vorhanden.'));
     }
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -186,7 +195,11 @@ class _ChatPageState extends State<ChatPage> {
           );
         }
         if (constraints.maxWidth < 720) {
-          return _ChatList(chats: _chats, onSelect: _loadMessages);
+          return _ChatList(
+            chats: _chats,
+            onSelect: _loadMessages,
+            onNewDirect: _newDirectChat,
+          );
         }
         return Row(
           children: [
@@ -196,6 +209,7 @@ class _ChatPageState extends State<ChatPage> {
                 chats: _chats,
                 selectedId: _selected?.id,
                 onSelect: _loadMessages,
+                onNewDirect: _newDirectChat,
               ),
             ),
             const VerticalDivider(width: 1),
@@ -227,38 +241,63 @@ class _ChatList extends StatelessWidget {
   const _ChatList({
     required this.chats,
     required this.onSelect,
+    required this.onNewDirect,
     this.selectedId,
   });
 
   final List<ChatSummary> chats;
   final String? selectedId;
   final ValueChanged<ChatSummary> onSelect;
+  final VoidCallback onNewDirect;
 
   @override
-  Widget build(BuildContext context) => ListView.separated(
-    itemCount: chats.length,
-    separatorBuilder: (_, _) => const Divider(height: 1),
-    itemBuilder: (context, index) {
-      final chat = chats[index];
-      return ListTile(
-        selected: selectedId == chat.id,
-        leading: Icon(
-          chat.type == ChatType.group
-              ? Icons.group_outlined
-              : Icons.person_outline,
+  Widget build(BuildContext context) => Column(
+    children: [
+      Padding(
+        padding: const EdgeInsets.all(12),
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: onNewDirect,
+            icon: const Icon(Icons.add_comment_outlined),
+            label: const Text('Neue Direktnachricht'),
+          ),
         ),
-        title: Text(chat.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          chat.lastMessage?.text ?? 'Noch keine Nachrichten',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: chat.unreadCount > 0
-            ? Badge(label: Text('${chat.unreadCount}'))
-            : null,
-        onTap: () => onSelect(chat),
-      );
-    },
+      ),
+      Expanded(
+        child: chats.isEmpty
+            ? const Center(child: Text('Noch keine Chats vorhanden.'))
+            : ListView.separated(
+                itemCount: chats.length,
+                separatorBuilder: (_, _) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final chat = chats[index];
+                  return ListTile(
+                    selected: selectedId == chat.id,
+                    leading: Icon(
+                      chat.type == ChatType.group
+                          ? Icons.group_outlined
+                          : Icons.person_outline,
+                    ),
+                    title: Text(
+                      chat.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text(
+                      chat.lastMessage?.text ?? 'Noch keine Nachrichten',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: chat.unreadCount > 0
+                        ? Badge(label: Text('${chat.unreadCount}'))
+                        : null,
+                    onTap: () => onSelect(chat),
+                  );
+                },
+              ),
+      ),
+    ],
   );
 }
 
