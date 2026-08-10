@@ -395,6 +395,108 @@ describe('Local authentication and application RBAC', () => {
       .expect(400);
   });
 
+  it('isolates calendars by target permission and validates event ranges', async () => {
+    const club = await request(app.getHttpServer())
+      .post('/api/v1/calendars')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ type: 'club', name: 'Vereinstermine' })
+      .expect(201);
+    const board = await request(app.getHttpServer())
+      .post('/api/v1/calendars')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ type: 'board', name: 'Vorstand intern', requiredPermission: 'chat.board.access' })
+      .expect(201);
+    const memberCalendars = await request(app.getHttpServer())
+      .get('/api/v1/calendars')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200);
+    expect(memberCalendars.body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: club.body.id })]),
+    );
+    expect(memberCalendars.body).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: board.body.id })]),
+    );
+    await request(app.getHttpServer())
+      .post('/api/v1/calendars')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ type: 'club', name: 'Nicht erlaubt' })
+      .expect(403);
+
+    const now = Date.now();
+    const event = await request(app.getHttpServer())
+      .post(`/api/v1/calendars/${club.body.id}/events`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Vereinsfest',
+        startsAt: new Date(now + 60_000).toISOString(),
+        endsAt: new Date(now + 3_600_000).toISOString(),
+        allDay: false,
+        location: 'Dojo',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/calendar-events?from=${encodeURIComponent(new Date(now).toISOString())}&to=${encodeURIComponent(new Date(now + 86_400_000).toISOString())}`,
+      )
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ id: event.body.id, title: 'Vereinsfest' }),
+          ]),
+        ),
+      );
+    await request(app.getHttpServer())
+      .post(`/api/v1/calendars/${club.body.id}/events`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Ungültig',
+        startsAt: new Date(now + 3_600_000).toISOString(),
+        endsAt: new Date(now + 60_000).toISOString(),
+        allDay: false,
+      })
+      .expect(400);
+  });
+
+  it('provides permission-filtered recurring training times', async () => {
+    const training = await request(app.getHttpServer())
+      .post('/api/v1/training-sessions')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: 'Kindertraining',
+        weekday: 2,
+        startsAt: '17:30',
+        endsAt: '19:00',
+        hall: 'Halle 1',
+        location: 'Musterstraße 1',
+        ageGroup: 'U13',
+        trainingGroup: 'Kinder',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .get('/api/v1/training-sessions')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: training.body.id, weekday: 2 })]),
+        ),
+      );
+    await request(app.getHttpServer())
+      .post('/api/v1/training-sessions')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({
+        name: 'Nicht erlaubt',
+        weekday: 2,
+        startsAt: '19:00',
+        endsAt: '18:00',
+        hall: 'Halle',
+        location: 'Ort',
+      })
+      .expect(403);
+  });
+
   async function createUser(username: string, firstName: string, password: string): Promise<User> {
     return dataSource.getRepository(User).save({
       organizationId: organization.id,

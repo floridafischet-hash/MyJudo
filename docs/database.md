@@ -41,3 +41,15 @@ wird der Status `former`, ausschließlich die Rolle `Mitglied / Eltern` wird
 entzogen und die Autorisierungsversion erhöht. Weitere Rollen bleiben erhalten.
 Ein PostgreSQL-Advisory-Lock verhindert parallele Verarbeitung durch mehrere
 Instanzen. Jeder Übergang erzeugt genau ein Audit-Ereignis.
+
+## Kalender und Training
+
+`calendars` kapselt private, vereinsweite, rollenbezogene und externe Kalender.
+Private Kalender sind genau einem Benutzer zugeordnet; andere Kalender können
+eine aktuelle RBAC-Permission als ACL tragen. `calendar_events` wird immer über
+Organisation und sichtbare Kalender begrenzt. Externe IDs sind je Quelle und
+Kalender eindeutig, sodass wiederholte Importe idempotent bleiben.
+
+`training_sessions` speichert dauerhafte wöchentliche Trainingszeiten mit
+Wochentag, Uhrzeit, Halle, Ort, Alters- und Trainingsgruppe. Datenbank-Checks
+erzwingen gültige Wochentage und eine Endzeit nach der Startzeit.

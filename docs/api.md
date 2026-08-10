@@ -33,8 +33,16 @@ Basispräfix: `/api/v1`
 | `GET` | `/polls/{id}` | `polls.vote` + Zielgruppe | Umfrage mit erlaubter Ergebnissicht laden |
 | `POST` | `/polls` | `polls.create` | Teilnahme- oder Auswahlumfrage erstellen |
 | `POST` | `/polls/{id}/vote` | `polls.vote` + Zielgruppe | Stimme atomar erstellen oder ändern |
+| `GET` | `/calendars` | `calendar.view` | Sichtbare Kalender mit ACL laden |
+| `POST` | `/calendars` | `calendar.create` | Privaten oder Vereinskalender erstellen |
+| `GET` | `/calendar-events?from=&to=` | `calendar.view` + Kalender-ACL | Termine im Zeitraum laden |
+| `POST` | `/calendars/{id}/events` | `calendar.create` + Kalender-ACL | Vereinseigenen Termin erstellen |
+| `PATCH` | `/calendar-events/{id}` | `calendar.edit` + Kalender-ACL | Vereinseigenen Termin ändern |
+| `GET` | `/training-sessions` | `calendar.view` | Wöchentliche Trainingszeiten laden |
+| `POST` | `/training-sessions` | `calendar.create` | Trainingszeit erstellen |
+| `PATCH` | `/training-sessions/{id}` | `calendar.edit` | Trainingszeit ändern |
+| `POST` | `/calendar-sync/njv` | `calendar.edit` | Offiziellen NJV-ICS-Import auslösen |
 
-Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
 Ungültige oder abgelaufene Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
 Nicht sichtbare oder mandantenfremde Chats liefern zur Vermeidung von IDOR/BOLA
 einheitlich HTTP 404.

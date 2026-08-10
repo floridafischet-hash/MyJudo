@@ -28,11 +28,17 @@ import { Poll } from './polls/poll.entity';
 import { PollOption } from './polls/poll-option.entity';
 import { PollVote } from './polls/poll-vote.entity';
 import { PollsModule } from './polls/polls.module';
+import { ClubCalendar } from './calendar/calendar.entity';
+import { CalendarEvent } from './calendar/calendar-event.entity';
+import { TrainingSession } from './calendar/training-session.entity';
+import { CalendarModule } from './calendar/calendar.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    ScheduleModule.forRoot(),
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
@@ -55,6 +61,9 @@ import { PollsModule } from './polls/polls.module';
           Poll,
           PollOption,
           PollVote,
+          ClubCalendar,
+          CalendarEvent,
+          TrainingSession,
         ],
         synchronize: false,
         migrationsRun: false,
@@ -68,6 +77,7 @@ import { PollsModule } from './polls/polls.module';
     InvitationsModule,
     ChatModule,
     PollsModule,
+    CalendarModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

@@ -20,5 +20,13 @@ export function validateEnvironment(environment: Record<string, unknown>): Recor
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT must be an integer between 1 and 65535');
   }
-  return { ...environment, PORT: port, JWT_ACCESS_TTL: environment.JWT_ACCESS_TTL ?? '15m' };
+  return {
+    ...environment,
+    PORT: port,
+    JWT_ACCESS_TTL: environment.JWT_ACCESS_TTL ?? '15m',
+    NJV_ICS_URL:
+      environment.NJV_ICS_URL ??
+      'https://www.njv.de/judo-kaempfen/termine-ics/calendar/ics/export/1-njv-kalender/calendar.ics?no_cache=1',
+    EXTERNAL_CALENDAR_SYNC_ENABLED: environment.EXTERNAL_CALENDAR_SYNC_ENABLED ?? 'false',
+  };
 }

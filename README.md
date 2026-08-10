@@ -2,7 +2,7 @@
 
 MyJudo ist eine mandantenfähige Vereinsplattform für Android, iOS, Windows und
 Web. Der aktuelle Stand umfasst lokale Anmeldung, serverseitiges RBAC,
-Mitgliederverwaltung und persistente Gruppen- und Direktchats.
+Mitgliederverwaltung, persistente Chats, Umfragen, Kalender und Trainingszeiten.
 
 ## Architektur
 
@@ -16,7 +16,8 @@ Mitgliederverwaltung und persistente Gruppen- und Direktchats.
 - Produktivroute: `https://212.227.20.171:18780`
 
 Details: [Architektur](docs/architecture.md),
-[Berechtigungen](docs/permissions.md), [API](docs/api.md) und
+[Berechtigungen](docs/permissions.md), [API](docs/api.md),
+[Integrationen](docs/integrations.md) und
 [Implementierungsplan](docs/implementation-plan.md).
 
 ## Entwicklung

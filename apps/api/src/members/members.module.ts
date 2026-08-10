@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { RbacModule } from '../rbac/rbac.module';
 import { Member } from './member.entity';
@@ -8,7 +7,7 @@ import { MembersController } from './members.controller';
 import { MembersService } from './members.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Member]), RbacModule, ScheduleModule.forRoot()],
+  imports: [TypeOrmModule.forFeature([Member]), RbacModule],
   controllers: [MembersController],
   providers: [MembersService, MembershipLifecycleService],
   exports: [MembershipLifecycleService],

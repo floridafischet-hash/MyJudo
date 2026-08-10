@@ -7,6 +7,7 @@ import { UserStatus } from '../users/user-status.enum';
 import { Role } from '../rbac/role.entity';
 import { UserRole } from '../rbac/user-role.entity';
 import { Chat, ChatType } from '../chat/chat.entity';
+import { CalendarType, ClubCalendar } from '../calendar/calendar.entity';
 
 const SYSTEM_CHATS = [
   ['general', 'Allgemein', 'chat.general.access'],
@@ -15,6 +16,15 @@ const SYSTEM_CHATS = [
   ['trainer', 'Trainer', 'chat.trainer.access'],
   ['youth', 'Jugendtrainer', 'chat.youth.access'],
   ['psg', 'PSG / Kinderschutz', 'chat.psg.access'],
+] as const;
+
+const SYSTEM_CALENDARS = [
+  ['club', 'Verein', CalendarType.Club, null],
+  ['trainer', 'Trainer', CalendarType.Trainer, 'chat.trainer.access'],
+  ['youth', 'Jugend', CalendarType.Youth, 'chat.youth.access'],
+  ['board', 'Vorstand', CalendarType.Board, 'chat.board.access'],
+  ['exams', 'Prüfungen', CalendarType.Exams, 'exams.view'],
+  ['njv', 'NJV', CalendarType.Association, null],
 ] as const;
 
 const USERS = [
@@ -77,6 +87,21 @@ async function bootstrap(): Promise<void> {
         requiredPermission,
         systemKey,
         directKey: null,
+        createdBy: firstUser.id,
+      });
+    }
+    for (const [systemKey, name, type, requiredPermission] of SYSTEM_CALENDARS) {
+      const existing = await manager
+        .getRepository(ClubCalendar)
+        .findOneBy({ organizationId: organization.id, systemKey });
+      if (existing) continue;
+      await manager.getRepository(ClubCalendar).save({
+        organizationId: organization.id,
+        type,
+        name,
+        ownerUserId: null,
+        requiredPermission,
+        systemKey,
         createdBy: firstUser.id,
       });
     }

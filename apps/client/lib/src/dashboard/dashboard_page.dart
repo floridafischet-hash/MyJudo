@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
 import '../chat/chat_page.dart';
+import '../calendar/calendar_page.dart';
 import '../members/member_list_page.dart';
 import '../polls/poll_page.dart';
 import '../users/pending_users_page.dart';
@@ -193,6 +194,19 @@ class _Content extends ConsumerWidget {
         const SizedBox(height: 28),
         if (index == 0)
           const _DashboardOverview()
+        else if (index == 1 &&
+            accessToken != null &&
+            permissions.contains('calendar.view'))
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height - 145,
+            child: Card(
+              clipBehavior: Clip.antiAlias,
+              child: CalendarPage(
+                accessToken: accessToken!,
+                permissions: permissions,
+              ),
+            ),
+          )
         else if (index == 2 &&
             accessToken != null &&
             currentUserId != null &&
