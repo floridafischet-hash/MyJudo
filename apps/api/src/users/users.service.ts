@@ -48,23 +48,23 @@ export class UsersService {
     query: ListUserDirectoryDto,
   ): Promise<{ items: DirectoryUser[]; page: number; pageSize: number; total: number }> {
     const builder = this.users
-      .createQueryBuilder('user')
-      .where('user."organizationId" = :organizationId', {
+      .createQueryBuilder('directory_user')
+      .where('directory_user.organizationId = :organizationId', {
         organizationId: actor.organizationId,
       })
-      .andWhere('user.status = :status', { status: UserStatus.Approved })
-      .andWhere('user.id <> :actorId', { actorId: actor.id })
-      .andWhere('user."deletedAt" IS NULL');
+      .andWhere('directory_user.status = :status', { status: UserStatus.Approved })
+      .andWhere('directory_user.id <> :actorId', { actorId: actor.id })
+      .andWhere('directory_user.deletedAt IS NULL');
     if (query.search) {
       builder.andWhere(
-        `(user."firstName" ILIKE :search OR user."lastName" ILIKE :search OR CONCAT(user."firstName", ' ', user."lastName") ILIKE :search)`,
+        `(directory_user.firstName ILIKE :search OR directory_user.lastName ILIKE :search OR CONCAT(directory_user.firstName, ' ', directory_user.lastName) ILIKE :search)`,
         { search: `%${escapeLike(query.search.trim())}%` },
       );
     }
     builder
-      .orderBy('user."lastName"', 'ASC')
-      .addOrderBy('user."firstName"', 'ASC')
-      .addOrderBy('user.id', 'ASC')
+      .orderBy('directory_user.lastName', 'ASC')
+      .addOrderBy('directory_user.firstName', 'ASC')
+      .addOrderBy('directory_user.id', 'ASC')
       .skip((query.page - 1) * query.pageSize)
       .take(query.pageSize);
     const [users, total] = await builder.getManyAndCount();
