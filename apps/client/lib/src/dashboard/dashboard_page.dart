@@ -162,7 +162,10 @@ class _Content extends ConsumerWidget {
             const SizedBox(height: 12),
             SizedBox(
               height: 360,
-              child: MemberListPage(accessToken: accessToken!),
+              child: MemberListPage(
+                accessToken: accessToken!,
+                permissions: permissions,
+              ),
             ),
           ],
           if (permissions.contains('users.approve')) ...[
