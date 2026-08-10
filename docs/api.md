@@ -20,6 +20,13 @@ Basispräfix: `/api/v1`
 | `POST` | `/invitations` | `users.invite` | einmaliges Einladungstoken erstellen |
 | `POST` | `/invitations/{id}/revoke` | `users.invite` | Einladung widerrufen |
 | `POST` | `/invitations/accept` | Keycloak-Token eines Pending-Kontos | Einladung einmalig annehmen |
+| `GET` | `/chats` | `chat.general.access` | Sichtbare Gruppen- und Direktchats mit Ungelesen-Zähler |
+| `POST` | `/chats/direct` | `chat.general.access` | Idempotenten Direktchat anlegen |
+| `GET` | `/chats/{id}/messages` | aktuelle Chatberechtigung | Nachrichten cursorbasiert laden |
+| `POST` | `/chats/{id}/messages` | aktuelle Chatberechtigung | Textnachricht persistent senden |
+| `POST` | `/chats/{id}/read` | aktuelle Chatberechtigung | Lesestand aktualisieren |
 
 Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
 Keycloak-Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
+Nicht sichtbare oder mandantenfremde Chats liefern zur Vermeidung von IDOR/BOLA
+einheitlich HTTP 404.

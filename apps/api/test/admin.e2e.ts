@@ -14,6 +14,7 @@ import { UserStatus } from '../src/users/user-status.enum';
 import { Member } from '../src/members/member.entity';
 import { MemberStatus } from '../src/members/member-status.enum';
 import { AuditLog } from '../src/audit/audit-log.entity';
+import { Chat, ChatType } from '../src/chat/chat.entity';
 
 describe('Keycloak authentication and application RBAC', () => {
   jest.setTimeout(30_000);
@@ -290,6 +291,85 @@ describe('Keycloak authentication and application RBAC', () => {
       .expect(404);
   });
 
+  it('protects direct and PSG chats on every request and tracks unread messages', async () => {
+    const memberToken = issueToken(memberSubject, []);
+    const stefanToken = issueToken(stefanSubject, ['superuser']);
+    const florianToken = issueToken(florianSubject, ['superuser']);
+    const direct = await request(app.getHttpServer())
+      .post('/api/v1/chats/direct')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ participantUserId: stefan.id })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/chats/${direct.body.id}/messages`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ text: '  Sichere Direktnachricht  ' })
+      .expect(201)
+      .expect(({ body }) => expect(body.text).toBe('Sichere Direktnachricht'));
+    await request(app.getHttpServer())
+      .get(`/api/v1/chats/${direct.body.id}/messages`)
+      .set('Authorization', `Bearer ${stefanToken}`)
+      .expect(200)
+      .expect(({ body }) => expect(body.items).toHaveLength(1));
+    await request(app.getHttpServer())
+      .get(`/api/v1/chats/${direct.body.id}/messages`)
+      .set('Authorization', `Bearer ${florianToken}`)
+      .expect(404);
+    await request(app.getHttpServer())
+      .get('/api/v1/chats')
+      .set('Authorization', `Bearer ${stefanToken}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: direct.body.id, unreadCount: 1 })]),
+        ),
+      );
+    await request(app.getHttpServer())
+      .post(`/api/v1/chats/${direct.body.id}/read`)
+      .set('Authorization', `Bearer ${stefanToken}`)
+      .expect(201);
+    await request(app.getHttpServer())
+      .get('/api/v1/chats')
+      .set('Authorization', `Bearer ${stefanToken}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body).toEqual(
+          expect.arrayContaining([expect.objectContaining({ id: direct.body.id, unreadCount: 0 })]),
+        ),
+      );
+
+    const psgChat = await dataSource.getRepository(Chat).save({
+      organizationId: member.organizationId,
+      type: ChatType.Group,
+      title: 'PSG Test',
+      requiredPermission: 'chat.psg.access',
+      systemKey: 'psg-test',
+      directKey: null,
+      createdBy: florian.id,
+    });
+    await request(app.getHttpServer())
+      .get(`/api/v1/chats/${psgChat.id}/messages`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(404);
+    const psgRole = await dataSource
+      .getRepository(Role)
+      .findOneByOrFail({ organizationId: member.organizationId, name: 'PSG / Kinderschutz' });
+    await dataSource.getRepository(UserRole).save({
+      userId: member.id,
+      roleId: psgRole.id,
+      assignedBy: florian.id,
+    });
+    await request(app.getHttpServer())
+      .get(`/api/v1/chats/${psgChat.id}/messages`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(200);
+    await dataSource.getRepository(UserRole).delete({ userId: member.id, roleId: psgRole.id });
+    await request(app.getHttpServer())
+      .get(`/api/v1/chats/${psgChat.id}/messages`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(404);
+  });
+
   async function ensureUser(
     organizationId: string,
     username: string,
@@ -321,6 +401,7 @@ describe('Keycloak authentication and application RBAC', () => {
       await manager.delete(AuditLog, { organizationId });
       await manager.delete(Invitation, { organizationId });
       await manager.delete(Member, { organizationId });
+      await manager.delete(Chat, { organizationId });
       await manager
         .createQueryBuilder()
         .delete()

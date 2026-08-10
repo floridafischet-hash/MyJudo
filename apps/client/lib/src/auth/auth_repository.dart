@@ -145,6 +145,7 @@ class AuthRepository {
         profileResponse.data ?? (throw const AuthException('Profil fehlt.'));
     if (!kIsWeb) await _storage.write(key: _refreshKey, value: refreshToken);
     return AuthSession(
+      userId: profile['id'] as String,
       accessToken: accessToken,
       refreshToken: refreshToken,
       expiresIn: (tokens['expires_in'] as num).toInt(),

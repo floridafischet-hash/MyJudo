@@ -8,6 +8,16 @@ import { RolePermission } from '../rbac/role-permission.entity';
 import { User } from '../users/user.entity';
 import { UserStatus } from '../users/user-status.enum';
 import { UserRole } from '../rbac/user-role.entity';
+import { Chat, ChatType } from '../chat/chat.entity';
+
+const SYSTEM_CHATS = [
+  { systemKey: 'general', title: 'Allgemein', requiredPermission: 'chat.general.access' },
+  { systemKey: 'board', title: 'Vorstand', requiredPermission: 'chat.board.access' },
+  { systemKey: 'clubwork', title: 'Vereinsarbeit', requiredPermission: 'chat.clubwork.access' },
+  { systemKey: 'trainer', title: 'Trainer', requiredPermission: 'chat.trainer.access' },
+  { systemKey: 'youth', title: 'Jugendtrainer', requiredPermission: 'chat.youth.access' },
+  { systemKey: 'psg', title: 'PSG / Kinderschutz', requiredPermission: 'chat.psg.access' },
+] as const;
 
 async function seed(): Promise<void> {
   const organizationSlug = required('INITIAL_ORGANIZATION_SLUG');
@@ -99,6 +109,22 @@ async function seed(): Promise<void> {
         { userId: admin.id, roleId: superuserRole.id, assignedBy: admin.id },
         { conflictPaths: ['userId', 'roleId'], skipUpdateIfNoValuesChanged: true },
       );
+    for (const systemChat of SYSTEM_CHATS) {
+      const existing = await manager.getRepository(Chat).findOneBy({
+        organizationId: organization.id,
+        systemKey: systemChat.systemKey,
+      });
+      if (existing) continue;
+      await manager.getRepository(Chat).save({
+        organizationId: organization.id,
+        type: ChatType.Group,
+        title: systemChat.title,
+        requiredPermission: systemChat.requiredPermission,
+        systemKey: systemChat.systemKey,
+        directKey: null,
+        createdBy: admin.id,
+      });
+    }
   });
   await dataSource.destroy();
 }

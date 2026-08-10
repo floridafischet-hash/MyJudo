@@ -10,7 +10,9 @@ Das Projekt befindet sich im Aufbau. Der aktuelle Stand umfasst das getestete
 Backend-Fundament, einen echten Flutter-Login, permission-gesteuerte
 Benutzerfreigabe sowie eine angebundene Mitgliederliste mit Suche, Pagination,
 Detailbearbeitung, Statuswechseln und automatischer Austrittsverarbeitung.
-Chat, Kalender, Prüfungen und weitere Fachmodule sind noch nicht fertig.
+Das Chat-Fundament umfasst geschützte Gruppen, Direktnachrichten, persistente
+Lesestände und eine responsive Flutter-Oberfläche. Dateianhänge, Push, Umfragen,
+Kalender, Prüfungen und weitere Fachmodule sind noch nicht fertig.
 
 ## Architektur
 

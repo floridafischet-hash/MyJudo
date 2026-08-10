@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
-import '../users/pending_users_page.dart';
 import '../members/member_list_page.dart';
+import '../users/pending_users_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -16,11 +16,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   int _selectedIndex = 0;
 
   static const destinations = [
-    NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home),
-      label: 'Home',
-    ),
+    NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
     NavigationDestination(
       icon: Icon(Icons.calendar_month_outlined),
       label: 'Kalender & Training',
@@ -44,6 +40,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final desktop = constraints.maxWidth >= 900;
+        final extended = constraints.maxWidth >= 1200;
         final session = ref.watch(authControllerProvider).value;
         final content = _Content(
           index: _selectedIndex,
@@ -53,7 +50,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         );
         if (!desktop) {
           return Scaffold(
-            appBar: AppBar(title: const Text('MyJudo')),
+            appBar: AppBar(
+              title: const _Brand(compact: true),
+              actions: [
+                IconButton(
+                  tooltip: 'Abmelden',
+                  onPressed: () =>
+                      ref.read(authControllerProvider.notifier).logout(),
+                  icon: const Icon(Icons.logout_rounded),
+                ),
+                const SizedBox(width: 8),
+              ],
+            ),
             body: content,
             bottomNavigationBar: NavigationBar(
               selectedIndex: _selectedIndex,
@@ -66,39 +74,71 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         return Scaffold(
           body: Row(
             children: [
-              NavigationRail(
-                extended: constraints.maxWidth >= 1200,
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (index) =>
-                    setState(() => _selectedIndex = index),
-                leading: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    'MyJudo',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+              Container(
+                width: extended ? 286 : 104,
+                color: const Color(0xFF201D1A),
+                child: NavigationRail(
+                  backgroundColor: Colors.transparent,
+                  extended: extended,
+                  minWidth: 104,
+                  minExtendedWidth: 286,
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (index) =>
+                      setState(() => _selectedIndex = index),
+                  indicatorColor: const Color(0xFF9E2A2B),
+                  selectedIconTheme: const IconThemeData(
+                    color: Colors.white,
+                    size: 28,
                   ),
-                ),
-                trailing: Expanded(
-                  child: Align(
-                    alignment: Alignment.bottomCenter,
-                    child: IconButton(
-                      tooltip: 'Abmelden',
-                      onPressed: () =>
-                          ref.read(authControllerProvider.notifier).logout(),
-                      icon: const Icon(Icons.logout),
+                  unselectedIconTheme: const IconThemeData(
+                    color: Color(0xFFD8CDC0),
+                    size: 27,
+                  ),
+                  selectedLabelTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                  unselectedLabelTextStyle: const TextStyle(
+                    color: Color(0xFFEAE1D6),
+                    fontWeight: FontWeight.w500,
+                    fontSize: 16,
+                  ),
+                  leading: const Padding(
+                    padding: EdgeInsets.fromLTRB(18, 26, 18, 30),
+                    child: _Brand(),
+                  ),
+                  trailing: Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: IconButton(
+                          tooltip: 'Abmelden',
+                          onPressed: () => ref
+                              .read(authControllerProvider.notifier)
+                              .logout(),
+                          icon: const Icon(
+                            Icons.logout,
+                            color: Color(0xFFEAE1D6),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
+                  destinations: destinations
+                      .map(
+                        (item) => NavigationRailDestination(
+                          icon: item.icon,
+                          label: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            child: Text(item.label),
+                          ),
+                        ),
+                      )
+                      .toList(),
                 ),
-                destinations: destinations
-                    .map(
-                      (item) => NavigationRailDestination(
-                        icon: item.icon,
-                        label: Text(item.label),
-                      ),
-                    )
-                    .toList(),
               ),
-              const VerticalDivider(width: 1),
               Expanded(child: content),
             ],
           ),
@@ -122,7 +162,7 @@ class _Content extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final titles = [
+    const titles = [
       'Dashboard',
       'Kalender & Training',
       'Chat & Kommunikation',
@@ -130,29 +170,23 @@ class _Content extends ConsumerWidget {
       'Einstellungen',
     ];
     return ListView(
-      padding: const EdgeInsets.all(24),
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.sizeOf(context).width >= 1200 ? 48 : 24,
+        vertical: 32,
+      ),
       children: [
-        Text(titles[index], style: Theme.of(context).textTheme.headlineMedium),
-        if (index == 0 && greetingName.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Text(
-            'Hallo $greetingName',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-        ],
-        const SizedBox(height: 16),
         if (index == 0)
-          const Wrap(
-            spacing: 16,
-            runSpacing: 16,
-            children: [
-              _StatusCard(title: 'Nächste Termine'),
-              _StatusCard(title: 'Benachrichtigungen'),
-              _StatusCard(title: 'Schnellzugriffe'),
-            ],
-          )
+          _WelcomeHeader(greetingName: greetingName)
+        else
+          Text(
+            titles[index],
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        const SizedBox(height: 28),
+        if (index == 0)
+          const _DashboardOverview()
         else if (index == 3 &&
             accessToken != null &&
             (permissions.contains('users.approve') ||
@@ -161,7 +195,7 @@ class _Content extends ConsumerWidget {
             Text('Mitglieder', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             SizedBox(
-              height: 360,
+              height: 420,
               child: MemberListPage(
                 accessToken: accessToken!,
                 permissions: permissions,
@@ -169,7 +203,7 @@ class _Content extends ConsumerWidget {
             ),
           ],
           if (permissions.contains('users.approve')) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             Text(
               'Ausstehende Registrierungen',
               style: Theme.of(context).textTheme.titleLarge,
@@ -183,7 +217,7 @@ class _Content extends ConsumerWidget {
         ] else if (index == 4)
           Align(
             alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
+            child: FilledButton.tonalIcon(
               onPressed: () =>
                   ref.read(authControllerProvider.notifier).logout(),
               icon: const Icon(Icons.logout),
@@ -191,38 +225,208 @@ class _Content extends ConsumerWidget {
             ),
           )
         else
-          const Card(
-            child: Padding(
-              padding: EdgeInsets.all(24),
-              child: Text('Dieses Fachmodul ist noch nicht implementiert.'),
-            ),
-          ),
+          const _ModuleInProgress(),
       ],
     );
   }
 }
 
+class _DashboardOverview extends StatelessWidget {
+  const _DashboardOverview();
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth >= 980
+            ? (constraints.maxWidth - 40) / 3
+            : constraints.maxWidth >= 620
+            ? (constraints.maxWidth - 20) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 20,
+          runSpacing: 20,
+          children: [
+            _StatusCard(
+              width: width,
+              icon: Icons.event_available_rounded,
+              title: 'Nächste Termine',
+              body: 'Deine kommenden Trainings und Vereinstermine.',
+            ),
+            _StatusCard(
+              width: width,
+              icon: Icons.notifications_none_rounded,
+              title: 'Benachrichtigungen',
+              body: 'Wichtige Neuigkeiten erscheinen gesammelt hier.',
+            ),
+            _StatusCard(
+              width: width,
+              icon: Icons.bolt_rounded,
+              title: 'Schnellzugriffe',
+              body: 'Direkter Einstieg in deine häufigsten Bereiche.',
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.title});
+  const _StatusCard({
+    required this.width,
+    required this.icon,
+    required this.title,
+    required this.body,
+  });
+  final double width;
+  final IconData icon;
   final String title;
+  final String body;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 320,
+      width: width,
       child: Card(
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 12),
-              const Text('Noch keine Daten verfügbar.'),
+              DecoratedBox(
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF3E4E1),
+                  shape: BoxShape.circle,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(11),
+                  child: Icon(icon, color: const Color(0xFF9E2A2B)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 9),
+              Text(body, style: Theme.of(context).textTheme.bodyLarge),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _WelcomeHeader extends StatelessWidget {
+  const _WelcomeHeader({required this.greetingName});
+  final String greetingName;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = greetingName.trim();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
+      decoration: BoxDecoration(
+        color: const Color(0xFF201D1A),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(width: 5, height: 62, color: const Color(0xFF9E2A2B)),
+          const SizedBox(width: 20),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name.isEmpty ? 'Willkommen bei MyJudo' : 'Hallo $name',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Dein Verein. Dein Training. Dein Weg.',
+                  style: TextStyle(color: Color(0xFFD8CDC0), fontSize: 16),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.circle, color: Color(0xFF9E2A2B), size: 18),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModuleInProgress extends StatelessWidget {
+  const _ModuleInProgress();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Card(
+      child: Padding(
+        padding: EdgeInsets.all(28),
+        child: Row(
+          children: [
+            Icon(Icons.construction_rounded, color: Color(0xFF9E2A2B)),
+            SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Dieses Modul wird gerade funktionsfähig aufgebaut.',
+                style: TextStyle(fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Brand extends StatelessWidget {
+  const _Brand({this.compact = false});
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: compact ? 34 : 42,
+          height: compact ? 34 : 42,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: Color(0xFF9E2A2B),
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            '柔',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: compact ? 18 : 21,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(width: 11),
+        Text(
+          'MyJudo',
+          style: TextStyle(
+            color: compact ? const Color(0xFF25221E) : Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: compact ? 20 : 24,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -23,6 +23,15 @@ mandantenbezogene Fach- und Auditdaten. Jede fachliche Abfrage erzwingt den
 - Superuser-Zugriff erfordert die Keycloak-Rolle und die lokale Rolle. PSG wird
   davon nicht implizit umfasst.
 
+## Kommunikation
+
+Gruppenkanäle referenzieren eine konkrete RBAC-Permission. Diese Permission wird
+bei jedem Listen-, Lese-, Schreib- und Lesestatus-Zugriff erneut serverseitig
+ausgewertet. Direktchats verwenden explizite Teilnehmer und einen eindeutigen,
+sortierten Teilnehmer-Schlüssel. Nachrichten werden cursorbasiert paginiert;
+Lesestände und Ungelesen-Zähler liegen persistent in PostgreSQL. Ein Rollenentzug
+entfernt damit unmittelbar auch den Zugriff auf geschützte Inhalte und Dateien.
+
 ## Geplante Infrastruktur
 
 - Redis/BullMQ für idempotente Hintergrundjobs und Benachrichtigungen

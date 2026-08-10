@@ -19,6 +19,10 @@ import { Member } from './members/member.entity';
 import { MembersModule } from './members/members.module';
 import { Invitation } from './invitations/invitation.entity';
 import { InvitationsModule } from './invitations/invitations.module';
+import { Chat } from './chat/chat.entity';
+import { ChatParticipant } from './chat/chat-participant.entity';
+import { Message } from './chat/message.entity';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -39,6 +43,9 @@ import { InvitationsModule } from './invitations/invitations.module';
           AuditLog,
           Member,
           Invitation,
+          Chat,
+          ChatParticipant,
+          Message,
         ],
         synchronize: false,
         migrationsRun: false,
@@ -50,6 +57,7 @@ import { InvitationsModule } from './invitations/invitations.module';
     UsersModule,
     MembersModule,
     InvitationsModule,
+    ChatModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

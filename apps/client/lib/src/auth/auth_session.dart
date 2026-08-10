@@ -1,5 +1,6 @@
 class AuthSession {
   const AuthSession({
+    required this.userId,
     required this.accessToken,
     required this.refreshToken,
     required this.expiresIn,
@@ -9,6 +10,7 @@ class AuthSession {
     this.displayName,
   });
 
+  final String userId;
   final String accessToken;
   final String refreshToken;
   final int expiresIn;
