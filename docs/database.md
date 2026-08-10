@@ -8,6 +8,12 @@ noch freien Mitgliedsnummer werden innerhalb derselben PostgreSQL-Transaktion wi
 Benutzeranlage geprüft. Erfolgreiche Annahmen erhalten ausschließlich die Standardrolle
 `Mitglied / Eltern`.
 
+## Mitgliederabfragen
+
+Die Mitgliederliste wird serverseitig gesucht, nach Status gefiltert, über eine feste
+Whitelist sortiert und mit maximal 100 Datensätzen pro Seite paginiert. Jede Abfrage ist
+zwingend auf die Organisation aus dem authentifizierten Benutzerkontext begrenzt.
+
 PostgreSQL ist die führende Datenhaltung. Schemaänderungen erfolgen nur über
 versionierte TypeORM-Migrationen; automatisches `synchronize` ist deaktiviert.
 

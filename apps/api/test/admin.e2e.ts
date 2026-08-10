@@ -184,6 +184,22 @@ describe('administrative user lifecycle', () => {
         userId: registration.body.id,
       })
       .expect(201);
+    const memberPage = await request(app.getHttpServer())
+      .get('/api/v1/members?page=1&pageSize=10&search=Test&status=active')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(memberPage.body).toEqual(
+      expect.objectContaining({
+        page: 1,
+        pageSize: 10,
+        total: 1,
+        items: [expect.objectContaining({ id: createdMember.body.id })],
+      }),
+    );
+    await request(app.getHttpServer())
+      .get('/api/v1/members?page=0')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(400);
     const csvExport = await request(app.getHttpServer())
       .get('/api/v1/members/export.csv')
       .set('Authorization', `Bearer ${adminToken}`)

@@ -1,11 +1,9 @@
 import {
   Body,
   Controller,
-  DefaultValuePipe,
   Get,
   Header,
   Param,
-  ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
@@ -23,6 +21,7 @@ import { Member } from './member.entity';
 import { MembersService } from './members.service';
 import type { Response } from 'express';
 import { Res } from '@nestjs/common';
+import { ListMembersDto } from './dto/list-members.dto';
 
 interface MemberRequest {
   user: AuthenticatedUser;
@@ -36,9 +35,9 @@ export class MembersController {
   @RequirePermissions('members.view')
   list(
     @Req() request: MemberRequest,
-    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
-  ): Promise<Member[]> {
-    return this.members.list(request.user, Math.min(Math.max(limit, 1), 100));
+    @Query() query: ListMembersDto,
+  ): Promise<{ items: Member[]; page: number; pageSize: number; total: number }> {
+    return this.members.list(request.user, query);
   }
   @Get('export.csv')
   @RequirePermissions('members.export')

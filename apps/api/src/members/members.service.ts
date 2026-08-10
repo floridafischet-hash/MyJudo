@@ -15,6 +15,7 @@ import { MemberStatus } from './member-status.enum';
 import { Member } from './member.entity';
 import type { Response } from 'express';
 import { strToU8, zipSync } from 'fflate';
+import { ListMembersDto, SortOrder } from './dto/list-members.dto';
 
 @Injectable()
 export class MembersService {
@@ -23,12 +24,31 @@ export class MembersService {
     private readonly dataSource: DataSource,
   ) {}
 
-  list(actor: AuthenticatedUser, limit: number): Promise<Member[]> {
-    return this.members.find({
-      where: { organizationId: actor.organizationId },
-      order: { lastName: 'ASC', firstName: 'ASC', id: 'ASC' },
-      take: limit,
-    });
+  async list(
+    actor: AuthenticatedUser,
+    query: ListMembersDto,
+  ): Promise<{ items: Member[]; page: number; pageSize: number; total: number }> {
+    const builder = this.members
+      .createQueryBuilder('member')
+      .where('member."organizationId" = :organizationId', {
+        organizationId: actor.organizationId,
+      })
+      .andWhere('member."deletedAt" IS NULL');
+    if (query.status) builder.andWhere('member.status = :status', { status: query.status });
+    if (query.search) {
+      builder.andWhere(
+        `(member."firstName" ILIKE :search OR member."lastName" ILIKE :search OR member."memberNumber" ILIKE :search)`,
+        { search: `%${escapeLike(query.search.trim())}%` },
+      );
+    }
+    const direction = query.order === SortOrder.Desc ? 'DESC' : 'ASC';
+    builder
+      .orderBy(`member."${query.sortBy}"`, direction)
+      .addOrderBy('member.id', 'ASC')
+      .skip((query.page - 1) * query.pageSize)
+      .take(query.pageSize);
+    const [items, total] = await builder.getManyAndCount();
+    return { items, page: query.page, pageSize: query.pageSize, total };
   }
 
   async create(actor: AuthenticatedUser, dto: CreateMemberDto): Promise<Member> {
@@ -160,6 +180,10 @@ export class MembersService {
 
 function csvCell(value: string): string {
   return `"${value.replaceAll('"', '""')}"`;
+}
+
+function escapeLike(value: string): string {
+  return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_');
 }
 
 function buildXlsx(rows: string[][]): Uint8Array {
