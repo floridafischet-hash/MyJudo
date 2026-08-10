@@ -73,7 +73,10 @@ class AuthRepository {
 
   Future<void> logout(String refreshToken) async {
     try {
-      await _dio.post<void>('/auth/logout', data: {'refreshToken': refreshToken});
+      await _dio.post<void>(
+        '/auth/logout',
+        data: {'refreshToken': refreshToken},
+      );
     } on DioException {
       // Local logout must still complete if the session is already expired.
     } finally {
