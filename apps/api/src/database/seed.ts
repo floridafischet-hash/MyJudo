@@ -5,25 +5,10 @@ import { Permission } from '../rbac/permission.entity';
 import { PERMISSIONS, STANDARD_ROLE_PERMISSIONS } from '../rbac/permission.catalog';
 import { Role } from '../rbac/role.entity';
 import { RolePermission } from '../rbac/role-permission.entity';
-import { User } from '../users/user.entity';
-import { UserStatus } from '../users/user-status.enum';
-import { UserRole } from '../rbac/user-role.entity';
-import { Chat, ChatType } from '../chat/chat.entity';
-
-const SYSTEM_CHATS = [
-  { systemKey: 'general', title: 'Allgemein', requiredPermission: 'chat.general.access' },
-  { systemKey: 'board', title: 'Vorstand', requiredPermission: 'chat.board.access' },
-  { systemKey: 'clubwork', title: 'Vereinsarbeit', requiredPermission: 'chat.clubwork.access' },
-  { systemKey: 'trainer', title: 'Trainer', requiredPermission: 'chat.trainer.access' },
-  { systemKey: 'youth', title: 'Jugendtrainer', requiredPermission: 'chat.youth.access' },
-  { systemKey: 'psg', title: 'PSG / Kinderschutz', requiredPermission: 'chat.psg.access' },
-] as const;
 
 async function seed(): Promise<void> {
   const organizationSlug = required('INITIAL_ORGANIZATION_SLUG');
   const organizationName = required('INITIAL_ORGANIZATION_NAME');
-  const adminEmail = process.env.INITIAL_ADMIN_EMAIL?.trim().toLocaleLowerCase('en-US');
-  const adminSubject = process.env.INITIAL_ADMIN_KEYCLOAK_SUBJECT?.trim();
 
   await dataSource.initialize();
   await dataSource.transaction(async (manager) => {
@@ -53,7 +38,6 @@ async function seed(): Promise<void> {
       ...STANDARD_ROLE_PERMISSIONS,
       Superuser: PERMISSIONS.filter((permission) => permission !== 'chat.psg.access'),
     };
-    const rolesByName = new Map<string, Role>();
     for (const [name, rolePermissions] of Object.entries(roleCatalog)) {
       let role = await manager
         .getRepository(Role)
@@ -65,7 +49,6 @@ async function seed(): Promise<void> {
         system: true,
       });
       role = await manager.getRepository(Role).save(role);
-      rolesByName.set(name, role);
       for (const key of rolePermissions) {
         const permission = permissionsByKey.get(key);
         if (!permission) throw new Error(`Permission not seeded: ${key}`);
@@ -76,54 +59,6 @@ async function seed(): Promise<void> {
             { conflictPaths: ['roleId', 'permissionId'], skipUpdateIfNoValuesChanged: true },
           );
       }
-    }
-
-    if (!adminEmail || !adminSubject) return;
-    let admin = await manager
-      .getRepository(User)
-      .findOneBy({ organizationId: organization.id, email: adminEmail });
-    if (!admin) {
-      admin = await manager.getRepository(User).save(
-        manager.getRepository(User).create({
-          organizationId: organization.id,
-          email: adminEmail,
-          identityProviderSubject: adminSubject,
-          firstName: 'Initial',
-          lastName: 'Administrator',
-          status: UserStatus.Approved,
-          approvedAt: new Date(),
-          approvedBy: null,
-        }),
-      );
-      admin.approvedBy = admin.id;
-      await manager.getRepository(User).save(admin);
-    } else if (!admin.identityProviderSubject) {
-      admin.identityProviderSubject = adminSubject;
-      await manager.getRepository(User).save(admin);
-    }
-    const superuserRole = rolesByName.get('Superuser');
-    if (!superuserRole) throw new Error('Superuser role was not seeded');
-    await manager
-      .getRepository(UserRole)
-      .upsert(
-        { userId: admin.id, roleId: superuserRole.id, assignedBy: admin.id },
-        { conflictPaths: ['userId', 'roleId'], skipUpdateIfNoValuesChanged: true },
-      );
-    for (const systemChat of SYSTEM_CHATS) {
-      const existing = await manager.getRepository(Chat).findOneBy({
-        organizationId: organization.id,
-        systemKey: systemChat.systemKey,
-      });
-      if (existing) continue;
-      await manager.getRepository(Chat).save({
-        organizationId: organization.id,
-        type: ChatType.Group,
-        title: systemChat.title,
-        requiredPermission: systemChat.requiredPermission,
-        systemKey: systemChat.systemKey,
-        directKey: null,
-        createdBy: admin.id,
-      });
     }
   });
   await dataSource.destroy();

@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/user.entity';
@@ -8,10 +9,18 @@ import { JwtStrategy } from './jwt.strategy';
 import { RbacModule } from '../rbac/rbac.module';
 import { Organization } from '../organizations/organization.entity';
 import { AuditLog } from '../audit/audit-log.entity';
+import { PasswordService } from './password.service';
+import { Session } from './session.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Organization, AuditLog]), PassportModule, RbacModule],
+  imports: [
+    TypeOrmModule.forFeature([User, Organization, Session, AuditLog]),
+    PassportModule,
+    JwtModule.register({}),
+    RbacModule,
+  ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, PasswordService, JwtStrategy],
+  exports: [PasswordService],
 })
 export class AuthModule {}

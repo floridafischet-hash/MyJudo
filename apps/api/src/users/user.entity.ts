@@ -5,10 +5,6 @@ import { UserStatus } from './user-status.enum';
 
 @Entity('users')
 @Index(['organizationId', 'email'], { unique: true, where: '"deletedAt" IS NULL' })
-@Index(['identityProviderSubject'], {
-  unique: true,
-  where: '"identityProviderSubject" IS NOT NULL AND "deletedAt" IS NULL',
-})
 export class User extends BaseEntity {
   @Column({ type: 'uuid' })
   organizationId!: string;
@@ -20,8 +16,8 @@ export class User extends BaseEntity {
   @Column({ type: 'varchar', length: 320 })
   email!: string;
 
-  @Column({ type: 'uuid', nullable: true })
-  identityProviderSubject!: string | null;
+  @Column({ type: 'varchar', length: 255 })
+  passwordHash!: string;
 
   @Column({ type: 'varchar', length: 100 })
   firstName!: string;

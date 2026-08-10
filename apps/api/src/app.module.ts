@@ -23,6 +23,7 @@ import { Chat } from './chat/chat.entity';
 import { ChatParticipant } from './chat/chat-participant.entity';
 import { Message } from './chat/message.entity';
 import { ChatModule } from './chat/chat.module';
+import { Session } from './auth/session.entity';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { ChatModule } from './chat/chat.module';
           Chat,
           ChatParticipant,
           Message,
+          Session,
         ],
         synchronize: false,
         migrationsRun: false,

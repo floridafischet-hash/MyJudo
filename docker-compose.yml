@@ -14,47 +14,6 @@ services:
       retries: 10
     networks: [backend]
 
-  keycloak-postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: keycloak
-      POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
-    volumes:
-      - keycloak_postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-    restart: unless-stopped
-    networks: [identity]
-
-  keycloak:
-    image: quay.io/keycloak/keycloak:26.7.0
-    command: start --import-realm
-    environment:
-      KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
-      KC_DB_USERNAME: keycloak
-      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?KEYCLOAK_DB_PASSWORD is required}
-      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:?KEYCLOAK_ADMIN_USERNAME is required}
-      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}
-      KC_HTTP_ENABLED: "true"
-      KC_HTTP_RELATIVE_PATH: /keycloak
-      KC_PROXY_HEADERS: xforwarded
-      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080/keycloak}
-      KC_HEALTH_ENABLED: "true"
-    volumes:
-      - ./deploy/keycloak/myjudo-realm.json:/opt/keycloak/data/import/myjudo-realm.json:ro
-    depends_on:
-      keycloak-postgres:
-        condition: service_healthy
-    ports:
-      - "127.0.0.1:${KEYCLOAK_HOST_PORT:-18881}:8080"
-    restart: unless-stopped
-    networks: [identity, frontend]
-
   api:
     build:
       context: .
@@ -64,17 +23,13 @@ services:
       PORT: 3000
       DATABASE_URL: postgresql://myjudo:${POSTGRES_PASSWORD:-development-only}@postgres:5432/myjudo
       APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN is required}
-      KEYCLOAK_URL: ${KEYCLOAK_PUBLIC_URL:-http://localhost:8080/keycloak}
-      KEYCLOAK_JWKS_URL: http://keycloak:8080/keycloak
-      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-myjudo}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-myjudo-client}
-      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-myjudo-api}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      PASSWORD_PEPPER: ${PASSWORD_PEPPER:?PASSWORD_PEPPER is required}
       INITIAL_ORGANIZATION_SLUG: ${INITIAL_ORGANIZATION_SLUG:-myjudo}
     depends_on:
       postgres:
         condition: service_healthy
-      keycloak:
-        condition: service_started
     ports:
       - "127.0.0.1:${API_HOST_PORT:-18779}:3000"
     restart: unless-stopped
@@ -82,11 +37,8 @@ services:
 
 volumes:
   postgres_data:
-  keycloak_postgres_data:
 
 networks:
   frontend:
   backend:
-    internal: true
-  identity:
     internal: true

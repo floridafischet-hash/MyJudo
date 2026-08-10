@@ -5,7 +5,10 @@ Basispräfix: `/api/v1`
 | Methode | Pfad | Auth | Zweck |
 |---|---|---|---|
 | `GET` | `/health` | nein | Liveness-Prüfung |
-| `GET` | `/auth/me` | Keycloak Bearer-Token | Profil und effektive Permissions |
+| `POST` | `/auth/login` | nein | Anmeldung mit Benutzername und Passwort |
+| `POST` | `/auth/refresh` | Refresh-Token | Sitzung sicher rotieren |
+| `POST` | `/auth/logout` | Refresh-Token | Sitzung widerrufen |
+| `GET` | `/auth/me` | Bearer-Token | Profil und effektive Permissions |
 | `GET` | `/users?status=pending` | `users.approve` | Ausstehende Benutzer des eigenen Vereins |
 | `PATCH` | `/users/{id}/approve` | `users.approve` | Benutzer freigeben und auditieren |
 | `PUT` | `/users/{id}/roles` | `roles.manage` | Rollen transaktional ersetzen |
@@ -20,7 +23,7 @@ Basispräfix: `/api/v1`
 | `GET` | `/members/export.xlsx` | `members.export` | XLSX exportieren und auditieren |
 | `POST` | `/invitations` | `users.invite` | einmaliges Einladungstoken erstellen |
 | `POST` | `/invitations/{id}/revoke` | `users.invite` | Einladung widerrufen |
-| `POST` | `/invitations/accept` | Keycloak-Token eines Pending-Kontos | Einladung einmalig annehmen |
+| `POST` | `/invitations/accept` | Bearer-Token eines Pending-Kontos | Einladung einmalig annehmen |
 | `GET` | `/chats` | `chat.general.access` | Sichtbare Gruppen- und Direktchats mit Ungelesen-Zähler |
 | `POST` | `/chats/direct` | `chat.general.access` | Idempotenten Direktchat anlegen |
 | `GET` | `/chats/{id}/messages` | aktuelle Chatberechtigung | Nachrichten cursorbasiert laden |
@@ -28,6 +31,6 @@ Basispräfix: `/api/v1`
 | `POST` | `/chats/{id}/read` | aktuelle Chatberechtigung | Lesestand aktualisieren |
 
 Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
-Keycloak-Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
+Ungültige oder abgelaufene Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
 Nicht sichtbare oder mandantenfremde Chats liefern zur Vermeidung von IDOR/BOLA
 einheitlich HTTP 404.

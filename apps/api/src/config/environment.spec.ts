@@ -3,10 +3,8 @@ import { validateEnvironment } from './environment';
 const validEnvironment = {
   DATABASE_URL: 'postgresql://localhost/myjudo',
   APP_ORIGIN: 'https://localhost:18780',
-  KEYCLOAK_URL: 'http://localhost:8080',
-  KEYCLOAK_REALM: 'myjudo',
-  KEYCLOAK_CLIENT_ID: 'myjudo-client',
-  KEYCLOAK_AUDIENCE: 'myjudo-api',
+  JWT_ACCESS_SECRET: 'a-secure-test-secret-with-more-than-32-characters',
+  PASSWORD_PEPPER: 'test-pepper',
 };
 
 describe('validateEnvironment', () => {

@@ -26,4 +26,15 @@ class AuthSession {
     if (display != null && display.isNotEmpty) return display;
     return username;
   }
+
+  factory AuthSession.fromJson(Map<String, dynamic> json) => AuthSession(
+    userId: json['userId'] as String,
+    accessToken: json['accessToken'] as String,
+    refreshToken: json['refreshToken'] as String,
+    expiresIn: (json['expiresIn'] as num).toInt(),
+    permissions: ((json['permissions'] as List<dynamic>?) ?? const []).whereType<String>().toSet(),
+    username: json['username'] as String,
+    firstName: json['firstName'] as String?,
+    displayName: json['displayName'] as String?,
+  );
 }

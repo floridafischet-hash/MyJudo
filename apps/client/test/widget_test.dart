@@ -6,7 +6,7 @@ import 'package:myjudo_client/src/auth/auth_controller.dart';
 import 'package:myjudo_client/src/auth/auth_session.dart';
 
 void main() {
-  testWidgets('shows the Keycloak login when no session exists', (
+  testWidgets('shows the local login when no session exists', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -19,8 +19,9 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('MyJudo'), findsOneWidget);
-    expect(find.textContaining('Keycloak'), findsOneWidget);
-    expect(find.text('Benutzername'), findsNothing);
+    expect(find.text('Willkommen zurück'), findsOneWidget);
+    expect(find.text('Benutzername'), findsOneWidget);
+    expect(find.text('Passwort'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Anmelden'), findsOneWidget);
   });
 

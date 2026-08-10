@@ -7,8 +7,6 @@ function contextWithUser(user?: {
   id: string;
   organizationId: string;
   authorizationVersion: number;
-  identityProviderSubject: string;
-  identityRoles: string[];
 }): ExecutionContext {
   return {
     getHandler: () => function handler() {},
@@ -38,8 +36,6 @@ describe('PermissionGuard', () => {
           id: 'user',
           organizationId: 'org',
           authorizationVersion: 0,
-          identityProviderSubject: 'subject',
-          identityRoles: [],
         }),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -54,20 +50,16 @@ describe('PermissionGuard', () => {
           id: 'user',
           organizationId: 'org',
           authorizationVersion: 0,
-          identityProviderSubject: 'subject',
-          identityRoles: [],
         }),
       ),
     ).resolves.toBe(true);
   });
 
-  it('requires both identity and local role for superuser and never bypasses PSG', async () => {
+  it('uses the local superuser role and never bypasses PSG', async () => {
     const user = contextWithUser({
       id: 'user',
       organizationId: 'org',
       authorizationVersion: 0,
-      identityProviderSubject: 'subject',
-      identityRoles: ['superuser'],
     });
     jest.spyOn(permissions, 'hasRole').mockResolvedValue(true);
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(false);
