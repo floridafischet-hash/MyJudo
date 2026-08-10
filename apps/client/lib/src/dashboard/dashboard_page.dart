@@ -78,44 +78,44 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           body: Row(
             children: [
               Container(
-                width: extended ? 286 : 104,
+                width: extended ? 372 : 135,
                 color: const Color(0xFF201D1A),
                 child: NavigationRail(
                   backgroundColor: Colors.transparent,
                   extended: extended,
-                  minWidth: 104,
-                  minExtendedWidth: 286,
+                  minWidth: 135,
+                  minExtendedWidth: 372,
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: (index) =>
                       setState(() => _selectedIndex = index),
                   indicatorColor: const Color(0xFF9E2A2B),
                   selectedIconTheme: const IconThemeData(
                     color: Colors.white,
-                    size: 28,
+                    size: 36,
                   ),
                   unselectedIconTheme: const IconThemeData(
                     color: Color(0xFFD8CDC0),
-                    size: 27,
+                    size: 35,
                   ),
                   selectedLabelTextStyle: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 16,
+                    fontSize: 21,
                   ),
                   unselectedLabelTextStyle: const TextStyle(
                     color: Color(0xFFEAE1D6),
                     fontWeight: FontWeight.w500,
-                    fontSize: 16,
+                    fontSize: 21,
                   ),
                   leading: const Padding(
-                    padding: EdgeInsets.fromLTRB(18, 26, 18, 30),
+                    padding: EdgeInsets.fromLTRB(23, 34, 23, 39),
                     child: _Brand(),
                   ),
                   trailing: Expanded(
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.only(bottom: 26),
                         child: IconButton(
                           tooltip: 'Abmelden',
                           onPressed: () => ref
@@ -124,6 +124,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           icon: const Icon(
                             Icons.logout,
                             color: Color(0xFFEAE1D6),
+                            size: 31,
                           ),
                         ),
                       ),
@@ -134,7 +135,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                         (item) => NavigationRailDestination(
                           icon: item.icon,
                           label: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            padding: const EdgeInsets.symmetric(vertical: 17),
                             child: Text(item.label),
                           ),
                         ),
@@ -451,8 +452,8 @@ class _Brand extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: compact ? 34 : 42,
-          height: compact ? 34 : 42,
+          width: compact ? 34 : 55,
+          height: compact ? 34 : 55,
           alignment: Alignment.center,
           decoration: const BoxDecoration(
             color: Color(0xFF9E2A2B),
@@ -462,18 +463,18 @@ class _Brand extends StatelessWidget {
             '柔',
             style: TextStyle(
               color: Colors.white,
-              fontSize: compact ? 18 : 21,
+              fontSize: compact ? 18 : 27,
               fontWeight: FontWeight.w700,
             ),
           ),
         ),
-        const SizedBox(width: 11),
+        SizedBox(width: compact ? 11 : 14),
         Text(
           'MyJudo',
           style: TextStyle(
             color: compact ? const Color(0xFF25221E) : Colors.white,
             fontWeight: FontWeight.w800,
-            fontSize: compact ? 20 : 24,
+            fontSize: compact ? 20 : 31,
           ),
         ),
       ],
