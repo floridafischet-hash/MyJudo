@@ -12,6 +12,7 @@ import { MembershipLifecycleService } from '../src/members/membership-lifecycle.
 import { Member } from '../src/members/member.entity';
 import { MemberStatus } from '../src/members/member-status.enum';
 import { UserRole } from '../src/rbac/user-role.entity';
+import { Invitation } from '../src/invitations/invitation.entity';
 
 describe('administrative user lifecycle', () => {
   jest.setTimeout(30_000);
@@ -34,6 +35,63 @@ describe('administrative user lifecycle', () => {
   afterAll(async () => app.close());
 
   it('enforces approval, tenant scope, permissions, audit and token invalidation', async () => {
+    const invitedEmail = `invited-${Date.now()}@example.test`;
+    const invitation = await request(app.getHttpServer())
+      .post('/api/v1/invitations')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ email: invitedEmail, expiresInHours: 24 })
+      .expect(201);
+    expect(invitation.body.token).toMatch(/^[A-Za-z0-9_-]{40,}$/);
+    const storedInvitation = await dataSource
+      .getRepository(Invitation)
+      .findOneByOrFail({ id: invitation.body.id as string });
+    expect(storedInvitation.tokenHash).not.toBe(invitation.body.token);
+    expect(storedInvitation.tokenHash).toMatch(/^[a-f0-9]{64}$/);
+    const invitedRegistration = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        organizationSlug: 'test-verein',
+        email: invitedEmail,
+        password: 'Invitation-Test-2026!',
+        firstName: 'Eingeladen',
+        lastName: 'Mitglied',
+        invitationToken: invitation.body.token,
+      })
+      .expect(201);
+    expect(invitedRegistration.body.status).toBe('approved');
+    await login(invitedEmail, 'Invitation-Test-2026!');
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        organizationSlug: 'test-verein',
+        email: `other-${Date.now()}@example.test`,
+        password: 'Invitation-Test-2026!',
+        firstName: 'Andere',
+        lastName: 'Person',
+        invitationToken: invitation.body.token,
+      })
+      .expect(409);
+    const revokedInvitation = await request(app.getHttpServer())
+      .post('/api/v1/invitations')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ expiresInHours: 24 })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/invitations/${revokedInvitation.body.id}/revoke`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        organizationSlug: 'test-verein',
+        email: `revoked-${Date.now()}@example.test`,
+        password: 'Invitation-Test-2026!',
+        firstName: 'Widerrufen',
+        lastName: 'Person',
+        invitationToken: revokedInvitation.body.token,
+      })
+      .expect(409);
+
     const email = `pending-${Date.now()}@example.test`;
     const registration = await request(app.getHttpServer())
       .post('/api/v1/auth/register')
@@ -109,6 +167,11 @@ describe('administrative user lifecycle', () => {
     await request(app.getHttpServer())
       .get('/api/v1/users')
       .set('Authorization', `Bearer ${refreshedMemberToken}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/api/v1/invitations')
+      .set('Authorization', `Bearer ${refreshedMemberToken}`)
+      .send({ expiresInHours: 24 })
       .expect(403);
 
     const createdMember = await request(app.getHttpServer())

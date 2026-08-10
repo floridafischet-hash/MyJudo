@@ -87,6 +87,11 @@ Visual-Studio-C++-Desktop-Toolchain; Android benötigt Android Studio/SDK.
 
 ## Sicherheit
 
+Registrierungen können durch den Vorstand freigegeben oder über eine zeitlich begrenzte,
+widerrufbare Einmal-Einladung bestätigt werden. Einladungstokens werden niemals im Klartext
+gespeichert. Optional lässt sich eine Einladung an eine E-Mail-Adresse und Mitgliedsnummer
+binden.
+
 - Jede Fachaktion wird serverseitig authentifiziert und autorisiert.
 - PSG-Zugriff ist nicht Bestandteil von Vorstand oder Trainer.
 - Refresh-Tokens werden nur gehasht gespeichert und bei Nutzung rotiert.

@@ -1,5 +1,13 @@
 # Datenbank
 
+## Einladungen
+
+`invitations` speichert ausschließlich den SHA-256-Hash eines kryptographisch zufälligen
+Tokens. Ablauf, Widerruf, Einmalverwendung, optionale E-Mail-Bindung und Zuordnung zu einer
+noch freien Mitgliedsnummer werden innerhalb derselben PostgreSQL-Transaktion wie die
+Benutzeranlage geprüft. Erfolgreiche Annahmen erhalten ausschließlich die Standardrolle
+`Mitglied / Eltern`.
+
 PostgreSQL ist die führende Datenhaltung. Schemaänderungen erfolgen nur über
 versionierte TypeORM-Migrationen; automatisches `synchronize` ist deaktiviert.
 

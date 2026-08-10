@@ -14,6 +14,11 @@ import { JwtService } from '@nestjs/jwt';
 import { AccessTokenPayload } from './auth.types';
 import { Session } from './session.entity';
 import { PermissionService } from '../rbac/permission.service';
+import { Invitation } from '../invitations/invitation.entity';
+import { hashInvitationToken } from '../invitations/invitations.service';
+import { Role } from '../rbac/role.entity';
+import { UserRole } from '../rbac/user-role.entity';
+import { Member } from '../members/member.entity';
 
 export interface TokenPair {
   accessToken: string;
@@ -48,35 +53,87 @@ export class AuthService {
       throw new ConflictException('Registrierung für diesen Verein ist nicht verfügbar.');
     }
     const email = normalizeEmail(dto.email);
-    const existing = await this.users.findOne({
-      where: { organizationId: organization.id, email },
-      withDeleted: true,
+    const passwordHash = await this.passwords.hash(dto.password);
+    return this.dataSource.transaction(async (manager) => {
+      const existing = await manager.getRepository(User).findOne({
+        where: { organizationId: organization.id, email },
+        withDeleted: true,
+      });
+      if (existing) {
+        throw new ConflictException('Für diese E-Mail-Adresse besteht bereits eine Registrierung.');
+      }
+      let invitation: Invitation | null = null;
+      if (dto.invitationToken) {
+        invitation = await manager.getRepository(Invitation).findOne({
+          where: {
+            organizationId: organization.id,
+            tokenHash: hashInvitationToken(dto.invitationToken),
+          },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (
+          !invitation ||
+          invitation.usedAt ||
+          invitation.revokedAt ||
+          invitation.expiresAt <= new Date() ||
+          (invitation.email !== null && invitation.email !== email)
+        ) {
+          throw new ConflictException('Die Einladung ist ungültig oder nicht mehr verwendbar.');
+        }
+      }
+      const approved = invitation !== null;
+      const saved = await manager.getRepository(User).save({
+        organizationId: organization.id,
+        email,
+        passwordHash,
+        firstName: dto.firstName.trim(),
+        lastName: dto.lastName.trim(),
+        status: approved ? UserStatus.Approved : UserStatus.Pending,
+        approvedAt: approved ? new Date() : null,
+        approvedBy: invitation?.invitedBy ?? null,
+      });
+      if (invitation) {
+        const memberRole = await manager.getRepository(Role).findOneBy({
+          organizationId: organization.id,
+          name: 'Mitglied / Eltern',
+        });
+        if (!memberRole) throw new Error('Default member role is missing');
+        await manager.getRepository(UserRole).save({
+          userId: saved.id,
+          roleId: memberRole.id,
+          assignedBy: invitation.invitedBy,
+        });
+        if (invitation.memberNumber) {
+          const member = await manager.getRepository(Member).findOne({
+            where: {
+              organizationId: organization.id,
+              memberNumber: invitation.memberNumber,
+            },
+            lock: { mode: 'pessimistic_write' },
+          });
+          if (!member || member.userId) {
+            throw new ConflictException(
+              'Die Einladung kann keinem freien Mitgliedsdatensatz zugeordnet werden.',
+            );
+          }
+          member.userId = saved.id;
+          await manager.getRepository(Member).save(member);
+        }
+        invitation.usedAt = new Date();
+        invitation.usedBy = saved.id;
+        await manager.getRepository(Invitation).save(invitation);
+      }
+      await manager.getRepository(AuditLog).save({
+        organizationId: organization.id,
+        actorUserId: saved.id,
+        action: invitation ? 'invitation.accepted' : 'user.registered',
+        entityType: 'user',
+        entityId: saved.id,
+        outcome: 'success',
+        metadata: invitation ? { invitationId: invitation.id } : null,
+      });
+      return { id: saved.id, status: saved.status };
     });
-    if (existing) {
-      throw new ConflictException('Für diese E-Mail-Adresse besteht bereits eine Registrierung.');
-    }
-
-    const user = this.users.create({
-      organizationId: organization.id,
-      email,
-      passwordHash: await this.passwords.hash(dto.password),
-      firstName: dto.firstName.trim(),
-      lastName: dto.lastName.trim(),
-      status: UserStatus.Pending,
-      approvedAt: null,
-      approvedBy: null,
-    });
-    const saved = await this.users.save(user);
-    await this.dataSource.getRepository(AuditLog).save({
-      organizationId: organization.id,
-      actorUserId: saved.id,
-      action: 'user.registered',
-      entityType: 'user',
-      entityId: saved.id,
-      outcome: 'success',
-      metadata: null,
-    });
-    return { id: saved.id, status: saved.status };
   }
 
   async login(

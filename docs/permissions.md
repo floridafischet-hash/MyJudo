@@ -26,3 +26,5 @@ Rollenänderungen ersetzen die Zuordnung transaktional und erhöhen die
 `authorizationVersion` des Benutzers. Bereits ausgestellte Access-Tokens sind
 dadurch sofort ungültig. Freigaben und Rollenänderungen sind mandantenbegrenzt
 und werden im Audit-Log protokolliert.
+`users.invite` erlaubt das Erstellen und Widerrufen zeitlich begrenzter Einladungen.
+Einladungstokens werden nur als SHA-256-Hash gespeichert und genau einmal akzeptiert.

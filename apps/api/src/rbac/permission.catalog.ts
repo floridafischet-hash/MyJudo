@@ -19,6 +19,7 @@ export const PERMISSIONS = [
   'calendar.create',
   'calendar.edit',
   'users.approve',
+  'users.invite',
   'roles.manage',
   'audit.view',
 ] as const;

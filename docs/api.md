@@ -18,6 +18,8 @@ Basispräfix: `/api/v1`
 | `PATCH` | `/members/{id}/status` | `members.status.change` | Status oder Austrittsvormerkung ändern |
 | `GET` | `/members/export.csv` | `members.export` | UTF-8-CSV exportieren und auditieren |
 | `GET` | `/members/export.xlsx` | `members.export` | XLSX exportieren und auditieren |
+| `POST` | `/invitations` | `users.invite` | einmaliges Einladungstoken erstellen |
+| `POST` | `/invitations/{id}/revoke` | `users.invite` | Einladung widerrufen |
 
 Validierungsfehler liefern HTTP 400, doppelte Registrierungen HTTP 409 und
 fehlgeschlagene beziehungsweise noch nicht freigegebene Anmeldungen HTTP 401.

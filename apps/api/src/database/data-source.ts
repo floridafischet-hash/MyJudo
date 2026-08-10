@@ -9,6 +9,7 @@ import { Role } from '../rbac/role.entity';
 import { UserRole } from '../rbac/user-role.entity';
 import { User } from '../users/user.entity';
 import { Member } from '../members/member.entity';
+import { Invitation } from '../invitations/invitation.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -23,6 +24,7 @@ export default new DataSource({
     AuditLog,
     Session,
     Member,
+    Invitation,
   ],
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
   synchronize: false,

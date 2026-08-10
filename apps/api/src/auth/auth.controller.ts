@@ -11,7 +11,7 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post('register')
-  @Throttle({ default: { limit: 3, ttl: 60 * 60 * 1000 } })
+  @Throttle({ default: { limit: 10, ttl: 60 * 60 * 1000 } })
   register(@Body() dto: RegisterDto): Promise<{ id: string; status: UserStatus }> {
     return this.auth.register(dto);
   }

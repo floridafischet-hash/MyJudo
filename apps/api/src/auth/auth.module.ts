@@ -11,10 +11,11 @@ import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { Session } from './session.entity';
 import { RbacModule } from '../rbac/rbac.module';
+import { Invitation } from '../invitations/invitation.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Organization, Session, AuditLog]),
+    TypeOrmModule.forFeature([User, Organization, Session, AuditLog, Invitation]),
     PassportModule,
     JwtModule.register({}),
     RbacModule,
