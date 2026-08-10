@@ -98,6 +98,13 @@ class _FakeChatRepository extends ChatRepository {
         createdAt: DateTime.utc(2026, 8, 10, 10),
       ),
     ),
+    if (directParticipantId != null)
+      const ChatSummary(
+        id: 'direct-chat',
+        type: ChatType.direct,
+        title: 'Stefan Test',
+        unreadCount: 0,
+      ),
   ];
 
   @override
