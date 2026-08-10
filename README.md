@@ -6,9 +6,10 @@ gemeinsamen Flutter-Codebasis. Das modulare Backend stellt Authentifizierung,
 serverseitiges RBAC, Datenhaltung, Realtime-Kommunikation und Hintergrundjobs
 bereit.
 
-Das Projekt befindet sich im Aufbau. Der aktuelle Stand ist das getestete
-Backend-Fundament; Fachmodule und Flutter-Client sind noch nicht als fertig zu
-betrachten.
+Das Projekt befindet sich im Aufbau. Der aktuelle Stand umfasst das getestete
+Backend-Fundament, einen echten Flutter-Login sowie permission-gesteuerte
+Benutzerfreigabe. Weitere Mitglieder- und Fachmodule sind noch nicht als fertig
+zu betrachten.
 
 ## Architektur
 

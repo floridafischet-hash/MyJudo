@@ -21,3 +21,8 @@ auf eine zuvor erzeugte URL.
 
 Die endgültige fachliche Zuordnung sensibler Mitgliedsfelder und PSG-Aktionen
 zu Rollen muss vor Freischaltung dieser Module vom Verein bestätigt werden.
+
+Rollenänderungen ersetzen die Zuordnung transaktional und erhöhen die
+`authorizationVersion` des Benutzers. Bereits ausgestellte Access-Tokens sind
+dadurch sofort ungültig. Freigaben und Rollenänderungen sind mandantenbegrenzt
+und werden im Audit-Log protokolliert.

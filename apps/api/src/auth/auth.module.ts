@@ -10,12 +10,14 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { PasswordService } from './password.service';
 import { Session } from './session.entity';
+import { RbacModule } from '../rbac/rbac.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, Organization, Session, AuditLog]),
     PassportModule,
     JwtModule.register({}),
+    RbacModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, PasswordService, JwtStrategy],

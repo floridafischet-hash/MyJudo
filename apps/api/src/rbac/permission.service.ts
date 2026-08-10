@@ -22,4 +22,19 @@ export class PermissionService {
     );
     return new Set(rows.map((row) => row.key)).size === new Set(required).size;
   }
+
+  async listForUser(userId: string, organizationId: string): Promise<string[]> {
+    const rows: Array<{ key: string }> = await this.dataSource.query(
+      `SELECT DISTINCT permission.key
+       FROM permissions permission
+       INNER JOIN role_permissions role_permission ON role_permission."permissionId" = permission.id
+       INNER JOIN roles role ON role.id = role_permission."roleId"
+       INNER JOIN user_roles user_role ON user_role."roleId" = role.id
+       WHERE user_role."userId" = $1 AND role."organizationId" = $2
+         AND role."deletedAt" IS NULL AND permission."deletedAt" IS NULL
+       ORDER BY permission.key`,
+      [userId, organizationId],
+    );
+    return rows.map((row) => row.key);
+  }
 }

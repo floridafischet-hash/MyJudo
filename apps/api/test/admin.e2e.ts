@@ -1,0 +1,125 @@
+import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { DataSource } from 'typeorm';
+import request = require('supertest');
+import { AppModule } from '../src/app.module';
+import { AuditLog } from '../src/audit/audit-log.entity';
+import { Organization } from '../src/organizations/organization.entity';
+import { User } from '../src/users/user.entity';
+import { UserStatus } from '../src/users/user-status.enum';
+import { PasswordService } from '../src/auth/password.service';
+
+describe('administrative user lifecycle', () => {
+  jest.setTimeout(30_000);
+  let app: INestApplication;
+  let dataSource: DataSource;
+  let adminToken: string;
+
+  beforeAll(async () => {
+    const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = module.createNestApplication();
+    app.setGlobalPrefix('api/v1');
+    app.useGlobalPipes(
+      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+    );
+    await app.init();
+    dataSource = app.get(DataSource);
+    adminToken = await login('admin@example.test', 'Temporary-Test-Only-2026!');
+  });
+
+  afterAll(async () => app.close());
+
+  it('enforces approval, tenant scope, permissions, audit and token invalidation', async () => {
+    const email = `pending-${Date.now()}@example.test`;
+    const registration = await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        organizationSlug: 'test-verein',
+        email,
+        password: 'Registration-Test-2026!',
+        firstName: 'Test',
+        lastName: 'Mitglied',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ organizationSlug: 'test-verein', email, password: 'Registration-Test-2026!' })
+      .expect(401);
+    const pending = await request(app.getHttpServer())
+      .get('/api/v1/users?status=pending')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    expect(pending.body).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: registration.body.id, email })]),
+    );
+
+    const foreignOrganization = await dataSource.getRepository(Organization).save({
+      slug: `foreign-${Date.now()}`,
+      name: 'Foreign',
+      timezone: 'Europe/Berlin',
+      active: true,
+    });
+    const passwordHash = await app.get(PasswordService).hash('Foreign-Test-2026!');
+    const foreignUser = await dataSource.getRepository(User).save({
+      organizationId: foreignOrganization.id,
+      email: `foreign-${Date.now()}@example.test`,
+      passwordHash,
+      firstName: 'Foreign',
+      lastName: 'User',
+      status: UserStatus.Pending,
+      approvedAt: null,
+      approvedBy: null,
+    });
+    await request(app.getHttpServer())
+      .patch(`/api/v1/users/${foreignUser.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .patch(`/api/v1/users/${registration.body.id}/approve`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const firstMemberToken = await login(email, 'Registration-Test-2026!');
+    await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${firstMemberToken}`)
+      .expect(403);
+
+    const roles = await request(app.getHttpServer())
+      .get('/api/v1/roles')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const memberRole = roles.body.find(
+      (role: { name: string }) => role.name === 'Mitglied / Eltern',
+    );
+    await request(app.getHttpServer())
+      .put(`/api/v1/users/${registration.body.id}/roles`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ roleIds: [memberRole.id] })
+      .expect(200);
+    await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${firstMemberToken}`)
+      .expect(401);
+    const refreshedMemberToken = await login(email, 'Registration-Test-2026!');
+    await request(app.getHttpServer())
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${refreshedMemberToken}`)
+      .expect(403);
+
+    const audits = await dataSource
+      .getRepository(AuditLog)
+      .findBy({ entityId: registration.body.id });
+    expect(audits.map((entry) => entry.action)).toEqual(
+      expect.arrayContaining(['user.registered', 'user.approved', 'user.roles.replaced']),
+    );
+  });
+
+  async function login(email: string, password: string): Promise<string> {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/auth/login')
+      .send({ organizationSlug: 'test-verein', email, password })
+      .expect(200);
+    return response.body.accessToken as string;
+  }
+});

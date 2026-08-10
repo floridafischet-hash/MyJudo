@@ -12,6 +12,26 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: myjudo
+          POSTGRES_USER: myjudo
+          POSTGRES_PASSWORD: test-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U myjudo -d myjudo"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://myjudo:test-password@127.0.0.1:5432/myjudo
+      JWT_ACCESS_SECRET: ci-only-secret-with-at-least-32-characters
+      PASSWORD_PEPPER: ci-only-pepper
+      APP_ORIGIN: https://localhost:18780
+      INITIAL_ORGANIZATION_SLUG: test-verein
+      INITIAL_ORGANIZATION_NAME: Test Verein
+      INITIAL_ADMIN_EMAIL: admin@example.test
+      INITIAL_ADMIN_PASSWORD: Temporary-Test-Only-2026!
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -23,5 +43,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run migration:run --workspace @myjudo/api
+      - run: npm run seed --workspace @myjudo/api
+      - run: npm run test:e2e --workspace @myjudo/api
       - run: npm run build
       - run: docker build -f apps/api/Dockerfile .

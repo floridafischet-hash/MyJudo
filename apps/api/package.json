@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint \"src/**/*.ts\" --max-warnings=0",
+    "format": "prettier --write \"{src,test}/**/*.ts\"",
+    "lint": "eslint \"{src,test}/**/*.ts\" --max-warnings=0",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main.js",
@@ -14,6 +14,7 @@
     "seed": "ts-node src/database/seed.ts",
     "test": "jest --runInBand",
     "test:cov": "jest --coverage --runInBand",
+    "test:e2e": "jest --config test/jest-e2e.json --runInBand",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -46,6 +47,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.3.1",
     "@types/passport-jwt": "^4.0.1",
+    "@types/supertest": "^6.0.3",
     "eslint": "^9.35.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

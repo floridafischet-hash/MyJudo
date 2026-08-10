@@ -13,11 +13,13 @@ import { PasswordService } from './password.service';
 import { JwtService } from '@nestjs/jwt';
 import { AccessTokenPayload } from './auth.types';
 import { Session } from './session.entity';
+import { PermissionService } from '../rbac/permission.service';
 
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  permissions: string[];
 }
 
 @Injectable()
@@ -32,6 +34,7 @@ export class AuthService {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly dataSource: DataSource,
+    private readonly permissions: PermissionService,
   ) {
     this.accessTtlSeconds = parseDurationSeconds(config.get<string>('JWT_ACCESS_TTL') ?? '15m');
   }
@@ -123,6 +126,7 @@ export class AuthService {
         accessToken: await this.signAccessToken(user),
         refreshToken: nextRefreshToken,
         expiresIn: this.accessTtlSeconds,
+        permissions: await this.permissions.listForUser(user.id, user.organizationId),
       };
     });
   }
@@ -154,6 +158,7 @@ export class AuthService {
       accessToken: await this.signAccessToken(user),
       refreshToken,
       expiresIn: this.accessTtlSeconds,
+      permissions: await this.permissions.listForUser(user.id, user.organizationId),
     };
   }
 

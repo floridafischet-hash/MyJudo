@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
+import '../users/pending_users_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -42,7 +43,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final desktop = constraints.maxWidth >= 900;
-        final content = _Content(index: _selectedIndex);
+        final session = ref.watch(authControllerProvider).value;
+        final content = _Content(
+          index: _selectedIndex,
+          accessToken: session?.accessToken,
+          permissions: session?.permissions ?? const {},
+        );
         if (!desktop) {
           return Scaffold(
             appBar: AppBar(title: const Text('MyJudo')),
@@ -100,12 +106,18 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 }
 
-class _Content extends StatelessWidget {
-  const _Content({required this.index});
+class _Content extends ConsumerWidget {
+  const _Content({
+    required this.index,
+    required this.accessToken,
+    required this.permissions,
+  });
   final int index;
+  final String? accessToken;
+  final Set<String> permissions;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final titles = [
       'Dashboard',
       'Kalender & Training',
@@ -127,6 +139,28 @@ class _Content extends StatelessWidget {
               _StatusCard(title: 'Benachrichtigungen'),
               _StatusCard(title: 'Schnellzugriffe'),
             ],
+          )
+        else if (index == 3 &&
+            permissions.contains('users.approve') &&
+            accessToken != null) ...[
+          Text(
+            'Ausstehende Registrierungen',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 420,
+            child: PendingUsersPage(accessToken: accessToken!),
+          ),
+        ] else if (index == 4)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: () =>
+                  ref.read(authControllerProvider.notifier).logout(),
+              icon: const Icon(Icons.logout),
+              label: const Text('Abmelden'),
+            ),
           )
         else
           const Card(

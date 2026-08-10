@@ -9,6 +9,10 @@ Basispräfix: `/api/v1`
 | `POST` | `/auth/login` | nein | Access- und Refresh-Token für freigegebene Benutzer |
 | `POST` | `/auth/refresh` | Refresh-Token | Rotiert die Session und stellt ein neues Tokenpaar aus |
 | `POST` | `/auth/logout` | Refresh-Token | Widerruft die serverseitige Session idempotent |
+| `GET` | `/users?status=pending` | `users.approve` | Ausstehende Benutzer des eigenen Vereins |
+| `PATCH` | `/users/{id}/approve` | `users.approve` | Benutzer freigeben und auditieren |
+| `PUT` | `/users/{id}/roles` | `roles.manage` | Rollen vollständig und transaktional ersetzen |
+| `GET` | `/roles` | `roles.manage` | Rollen des eigenen Vereins auflisten |
 
 Validierungsfehler liefern HTTP 400, doppelte Registrierungen HTTP 409 und
 fehlgeschlagene beziehungsweise noch nicht freigegebene Anmeldungen HTTP 401.
