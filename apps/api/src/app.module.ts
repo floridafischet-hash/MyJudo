@@ -1,0 +1,49 @@
+import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { HealthController } from './health/health.controller';
+import { validateEnvironment } from './config/environment';
+import { Organization } from './organizations/organization.entity';
+import { User } from './users/user.entity';
+import { Permission } from './rbac/permission.entity';
+import { Role } from './rbac/role.entity';
+import { UserRole } from './rbac/user-role.entity';
+import { RolePermission } from './rbac/role-permission.entity';
+import { AuditLog } from './audit/audit-log.entity';
+import { Session } from './auth/session.entity';
+import { AuthModule } from './auth/auth.module';
+import { RbacModule } from './rbac/rbac.module';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        type: 'postgres',
+        url: config.getOrThrow<string>('DATABASE_URL'),
+        entities: [
+          Organization,
+          User,
+          Permission,
+          Role,
+          UserRole,
+          RolePermission,
+          AuditLog,
+          Session,
+        ],
+        synchronize: false,
+        migrationsRun: false,
+        logging: config.get<string>('NODE_ENV') === 'development' ? ['error', 'warn'] : ['error'],
+      }),
+    }),
+    AuthModule,
+    RbacModule,
+  ],
+  controllers: [HealthController],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+})
+export class AppModule {}

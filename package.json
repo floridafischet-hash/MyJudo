@@ -1,0 +1,15 @@
+{
+  "name": "myjudo",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/api"],
+  "scripts": {
+    "build": "npm run build --workspace @myjudo/api",
+    "format": "npm run format --workspace @myjudo/api",
+    "lint": "npm run lint --workspace @myjudo/api",
+    "test": "npm run test --workspace @myjudo/api",
+    "test:cov": "npm run test:cov --workspace @myjudo/api",
+    "typecheck": "npm run typecheck --workspace @myjudo/api"
+  },
+  "engines": { "node": ">=22 <25" }
+}

@@ -1,0 +1,18 @@
+import 'reflect-metadata';
+import { DataSource } from 'typeorm';
+import { AuditLog } from '../audit/audit-log.entity';
+import { Session } from '../auth/session.entity';
+import { Organization } from '../organizations/organization.entity';
+import { Permission } from '../rbac/permission.entity';
+import { RolePermission } from '../rbac/role-permission.entity';
+import { Role } from '../rbac/role.entity';
+import { UserRole } from '../rbac/user-role.entity';
+import { User } from '../users/user.entity';
+
+export default new DataSource({
+  type: 'postgres',
+  url: process.env.DATABASE_URL,
+  entities: [Organization, User, Permission, Role, UserRole, RolePermission, AuditLog, Session],
+  migrations: [`${__dirname}/migrations/*{.ts,.js}`],
+  synchronize: false,
+});
