@@ -190,8 +190,9 @@ class _MemberEditorDialogState extends State<MemberEditorDialog> {
                       ? null
                       : (value) => setState(() {
                           _status = value ?? _status;
-                          if (_status != MemberStatus.exitScheduled)
+                          if (_status != MemberStatus.exitScheduled) {
                             _exitDate = null;
+                          }
                         }),
                 ),
                 if (_status == MemberStatus.exitScheduled) ...[
