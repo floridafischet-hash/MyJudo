@@ -16,6 +16,8 @@ mandantenbezogene Fach- und Auditdaten. Jede fachliche Abfrage erzwingt den
 - Das Backend validiert RS256-Signatur, Issuer, Audience und Ablauf gegen die
   gecachten Keycloak-JWKS.
 - Lokale Benutzer werden unveränderlich über den Keycloak-`sub`-Claim verknüpft.
+- Eine neue Keycloak-Identität wird beim ersten API-Kontakt lokal nur als `pending`
+  provisioniert. Fachzugriff entsteht erst nach Vorstandsfreigabe oder gültiger Einladung.
 - Keycloak liefert Identität und die grobe `superuser`-Entitlement-Rolle; das
   lokale, mandantenbezogene RBAC bleibt Source of Truth für Fach-Permissions.
 - Superuser-Zugriff erfordert die Keycloak-Rolle und die lokale Rolle. PSG wird

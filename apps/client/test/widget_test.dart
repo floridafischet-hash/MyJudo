@@ -25,11 +25,28 @@ void main() {
   });
 
   for (final testCase in [
-    (firstName: 'Florian', displayName: 'Florian Fischer', username: 'florian', expected: 'Hallo Florian'),
-    (firstName: null, displayName: 'Stefan Beispiel', username: 'stefan', expected: 'Hallo Stefan Beispiel'),
-    (firstName: null, displayName: null, username: 'ffischer', expected: 'Hallo ffischer'),
+    (
+      firstName: 'Florian',
+      displayName: 'Florian Fischer',
+      username: 'florian',
+      expected: 'Hallo Florian',
+    ),
+    (
+      firstName: null,
+      displayName: 'Stefan Beispiel',
+      username: 'stefan',
+      expected: 'Hallo Stefan Beispiel',
+    ),
+    (
+      firstName: null,
+      displayName: null,
+      username: 'ffischer',
+      expected: 'Hallo ffischer',
+    ),
   ]) {
-    testWidgets('greets the authenticated user with ${testCase.expected}', (tester) async {
+    testWidgets('greets the authenticated user with ${testCase.expected}', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

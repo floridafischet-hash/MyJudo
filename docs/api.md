@@ -12,11 +12,14 @@ Basispräfix: `/api/v1`
 | `GET` | `/roles` | `roles.manage` | Rollen des eigenen Vereins auflisten |
 | `GET` | `/members` | `members.view` | Suche, Filter, Sortierung und Pagination |
 | `POST` | `/members` | `members.create` | Mitglied anlegen |
+| `GET` | `/members/{id}` | `members.view` | Mandantengeschützte Detailansicht |
+| `PATCH` | `/members/{id}` | `members.edit` | Stammdaten ändern und auditieren |
 | `PATCH` | `/members/{id}/status` | `members.status.change` | Status oder Austritt ändern |
 | `GET` | `/members/export.csv` | `members.export` | UTF-8-CSV exportieren und auditieren |
 | `GET` | `/members/export.xlsx` | `members.export` | XLSX exportieren und auditieren |
 | `POST` | `/invitations` | `users.invite` | einmaliges Einladungstoken erstellen |
 | `POST` | `/invitations/{id}/revoke` | `users.invite` | Einladung widerrufen |
+| `POST` | `/invitations/accept` | Keycloak-Token eines Pending-Kontos | Einladung einmalig annehmen |
 
 Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
 Keycloak-Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.

@@ -13,7 +13,7 @@ Weitere Mitglieder- und Fachmodule sind noch nicht als fertig zu betrachten.
 
 ## Architektur
 
-- Client: Flutter (geplant; Toolchain wird eingerichtet)
+- Client: Flutter für Android, iOS, Windows und Web
 - Backend: NestJS/TypeScript
 - Datenbank: PostgreSQL 17
 - Auth: Keycloak 26.7, OpenID Connect Authorization Code mit PKCE
@@ -97,7 +97,8 @@ binden.
 - Passwörter, Login, Reset und Sessions liegen ausschließlich in Keycloak.
 - Das Backend validiert RS256-Signatur, Issuer, Audience und Ablauf über JWKS.
 - Geheimnisse, Schlüssel und Zertifikate sind durch `.gitignore` ausgeschlossen.
-- Login und Registrierung sind rate-limitiert.
+- Keycloak schützt Login und Registrierung; die API akzeptiert ausschließlich korrekt
+  ausgestellte RS256-Tokens und erzwingt zusätzlich lokalen Kontostatus und RBAC.
 - Audit-Logs speichern keine Passwörter, Tokens oder Chat-Inhalte.
 
 Vor einer produktiven Freischaltung sind Domain/öffentlich vertrauenswürdiges

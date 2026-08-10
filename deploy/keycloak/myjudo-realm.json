@@ -50,7 +50,7 @@
           }
         }
       ],
-      "defaultClientScopes": ["web-origins", "acr", "roles", "profile", "email"]
+      "defaultClientScopes": ["web-origins", "acr", "basic", "roles", "profile", "email"]
     }
   ]
 }

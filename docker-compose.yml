@@ -69,6 +69,7 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-myjudo}
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-myjudo-client}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-myjudo-api}
+      INITIAL_ORGANIZATION_SLUG: ${INITIAL_ORGANIZATION_SLUG:-myjudo}
     depends_on:
       postgres:
         condition: service_healthy

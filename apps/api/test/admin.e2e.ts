@@ -5,7 +5,6 @@ import { Test } from '@nestjs/testing';
 import { sign } from 'jsonwebtoken';
 import { DataSource } from 'typeorm';
 import request = require('supertest');
-import { AppModule } from '../src/app.module';
 import { Invitation } from '../src/invitations/invitation.entity';
 import { Organization } from '../src/organizations/organization.entity';
 import { Role } from '../src/rbac/role.entity';
@@ -50,7 +49,12 @@ describe('Keycloak authentication and application RBAC', () => {
     process.env.KEYCLOAK_REALM = 'myjudo';
     process.env.KEYCLOAK_CLIENT_ID = 'myjudo-client';
     process.env.KEYCLOAK_AUDIENCE = 'myjudo-api';
+    process.env.DATABASE_URL ??=
+      'postgresql://myjudo:development-only@127.0.0.1:15432/myjudo';
+    process.env.APP_ORIGIN ??= 'http://localhost:8080';
+    process.env.INITIAL_ORGANIZATION_SLUG ??= 'test-verein';
 
+    const { AppModule } = await import('../src/app.module');
     const module = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = module.createNestApplication();
     app.setGlobalPrefix('api/v1');
@@ -88,10 +92,12 @@ describe('Keycloak authentication and application RBAC', () => {
   });
 
   afterAll(async () => {
-    await app.close();
-    await new Promise<void>((resolve, reject) =>
-      jwksServer.close((error) => (error ? reject(error) : resolve())),
-    );
+    if (app) await app.close();
+    if (jwksServer) {
+      await new Promise<void>((resolve, reject) =>
+        jwksServer.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
   });
 
   it.each([

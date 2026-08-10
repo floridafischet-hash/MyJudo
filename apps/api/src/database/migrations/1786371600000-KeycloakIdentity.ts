@@ -27,12 +27,14 @@ export class KeycloakIdentity1786371600000 implements MigrationInterface {
         "userAgent" varchar(500),
         "ipAddress" inet,
         "createdAt" timestamptz NOT NULL DEFAULT now(),
-        "updatedAt" timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT "PK_sessions" PRIMARY KEY ("id"),
         CONSTRAINT "UQ_sessions_refresh_hash" UNIQUE ("refreshTokenHash"),
         CONSTRAINT "FK_sessions_organization" FOREIGN KEY ("organizationId") REFERENCES "organizations"("id") ON DELETE CASCADE,
         CONSTRAINT "FK_sessions_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
       )
     `);
+    await queryRunner.query(
+      `CREATE INDEX "IDX_sessions_user_expiry" ON "sessions" ("userId", "expiresAt")`,
+    );
   }
 }
