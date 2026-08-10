@@ -2,7 +2,8 @@
 
 MyJudo ist eine mandantenfähige Vereinsplattform für Android, iOS, Windows und
 Web. Der aktuelle Stand umfasst lokale Anmeldung, serverseitiges RBAC,
-Mitgliederverwaltung, persistente Chats, Umfragen, Kalender und Trainingszeiten.
+Mitgliederverwaltung, persistente Chats, Umfragen, Kalender, Trainingszeiten und
+Gürtelprüfungen mit CSV-/XLSX-Export.
 
 ## Architektur
 

@@ -33,6 +33,9 @@ import { CalendarEvent } from './calendar/calendar-event.entity';
 import { TrainingSession } from './calendar/training-session.entity';
 import { CalendarModule } from './calendar/calendar.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { Exam } from './exams/exam.entity';
+import { ExamParticipant } from './exams/exam-participant.entity';
+import { ExamsModule } from './exams/exams.module';
 
 @Module({
   imports: [
@@ -64,6 +67,8 @@ import { ScheduleModule } from '@nestjs/schedule';
           ClubCalendar,
           CalendarEvent,
           TrainingSession,
+          Exam,
+          ExamParticipant,
         ],
         synchronize: false,
         migrationsRun: false,
@@ -78,6 +83,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ChatModule,
     PollsModule,
     CalendarModule,
+    ExamsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

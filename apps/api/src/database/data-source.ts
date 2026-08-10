@@ -19,6 +19,8 @@ import { PollVote } from '../polls/poll-vote.entity';
 import { ClubCalendar } from '../calendar/calendar.entity';
 import { CalendarEvent } from '../calendar/calendar-event.entity';
 import { TrainingSession } from '../calendar/training-session.entity';
+import { Exam } from '../exams/exam.entity';
+import { ExamParticipant } from '../exams/exam-participant.entity';
 
 export default new DataSource({
   type: 'postgres',
@@ -43,6 +45,8 @@ export default new DataSource({
     ClubCalendar,
     CalendarEvent,
     TrainingSession,
+    Exam,
+    ExamParticipant,
   ],
   migrations: [`${__dirname}/migrations/*{.ts,.js}`],
   synchronize: false,

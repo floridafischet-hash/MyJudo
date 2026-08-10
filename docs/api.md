@@ -42,7 +42,14 @@ Basispräfix: `/api/v1`
 | `POST` | `/training-sessions` | `calendar.create` | Trainingszeit erstellen |
 | `PATCH` | `/training-sessions/{id}` | `calendar.edit` | Trainingszeit ändern |
 | `POST` | `/calendar-sync/njv` | `calendar.edit` | Offiziellen NJV-ICS-Import auslösen |
+| `GET` | `/exams` | `exams.view` | Prüfungen mit Teilnehmenden paginiert laden |
+| `POST` | `/exams` | `exams.create` | Prüfung erstellen |
+| `PATCH` | `/exams/{id}` | `exams.edit` | Prüfung bearbeiten |
+| `POST` | `/exams/{id}/participants` | `exams.edit` | Mitglied eindeutig zur Prüfung hinzufügen |
+| `PATCH` | `/exam-participants/{id}` | `exams.edit` | Grad oder Prüfungsstatus ändern |
+| `GET` | `/exams/export.csv` | `exams.export` | Prüfungsdaten als UTF-8-CSV exportieren und auditieren |
+| `GET` | `/exams/export.xlsx` | `exams.export` | Prüfungsdaten als XLSX exportieren und auditieren |
 
 Ungültige oder abgelaufene Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
-Nicht sichtbare oder mandantenfremde Chats liefern zur Vermeidung von IDOR/BOLA
-einheitlich HTTP 404.
+Nicht sichtbare oder mandantenfremde Ressourcen liefern zur Vermeidung von
+IDOR/BOLA einheitlich HTTP 404.

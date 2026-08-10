@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../auth/auth_controller.dart';
 import '../chat/chat_page.dart';
 import '../calendar/calendar_page.dart';
+import '../exams/exam_page.dart';
 import '../members/member_list_page.dart';
 import '../polls/poll_page.dart';
 import '../users/pending_users_page.dart';
@@ -255,7 +256,8 @@ class _Content extends ConsumerWidget {
         else if (index == 3 &&
             accessToken != null &&
             (permissions.contains('users.approve') ||
-                permissions.contains('members.view'))) ...[
+                permissions.contains('members.view') ||
+                permissions.contains('exams.view'))) ...[
           if (permissions.contains('members.view')) ...[
             Text('Mitglieder', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
@@ -264,6 +266,19 @@ class _Content extends ConsumerWidget {
               child: MemberListPage(
                 accessToken: accessToken!,
                 permissions: permissions,
+              ),
+            ),
+          ],
+          if (permissions.contains('exams.view')) ...[
+            const SizedBox(height: 28),
+            SizedBox(
+              height: 520,
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                child: ExamPage(
+                  accessToken: accessToken!,
+                  permissions: permissions,
+                ),
               ),
             ),
           ],

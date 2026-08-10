@@ -53,3 +53,12 @@ Kalender eindeutig, sodass wiederholte Importe idempotent bleiben.
 `training_sessions` speichert dauerhafte wöchentliche Trainingszeiten mit
 Wochentag, Uhrzeit, Halle, Ort, Alters- und Trainingsgruppe. Datenbank-Checks
 erzwingen gültige Wochentage und eine Endzeit nach der Startzeit.
+
+## Gürtelprüfungen
+
+`exams` speichert Datum, Bezeichnung und Ort einer Prüfung. Die normalisierte
+Tabelle `exam_participants` verbindet Prüfungen mit Mitgliedern und hält Zielgrad
+(`kyu` oder `dan`) und Status. Ein eindeutiger Constraint verhindert doppelte
+Teilnahmen desselben Mitglieds an derselben Prüfung. Ein Datenbank-Check erlaubt
+nur 1.–8. Kyu beziehungsweise 1.–10. Dan. Alle Lese- und Schreibzugriffe werden
+zusätzlich über die Organisation des authentifizierten Benutzers begrenzt.

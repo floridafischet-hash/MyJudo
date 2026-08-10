@@ -497,6 +497,98 @@ describe('Local authentication and application RBAC', () => {
       .expect(403);
   });
 
+  it('manages belt exams with grade rules, exports, audit and negative RBAC', async () => {
+    await request(app.getHttpServer())
+      .get('/api/v1/exams')
+      .set('Authorization', `Bearer ${memberToken}`)
+      .expect(403);
+    const candidate = await request(app.getHttpServer())
+      .post('/api/v1/members')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        memberNumber: `EX-${suffix}`,
+        firstName: 'Erika',
+        lastName: 'Prüfling',
+      })
+      .expect(201);
+    const exam = await request(app.getHttpServer())
+      .post('/api/v1/exams')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Sommerprüfung',
+        examDate: '2026-08-22',
+        location: 'Dojo',
+      })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/exams/${exam.body.id}/participants`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ memberId: candidate.body.id, gradeType: 'kyu', grade: 9 })
+      .expect(400);
+    const participant = await request(app.getHttpServer())
+      .post(`/api/v1/exams/${exam.body.id}/participants`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ memberId: candidate.body.id, gradeType: 'kyu', grade: 5 })
+      .expect(201);
+    expect(participant.body).toEqual(
+      expect.objectContaining({ memberName: 'Erika Prüfling', belt: '5. Kyu', status: 'planned' }),
+    );
+    await request(app.getHttpServer())
+      .post(`/api/v1/exams/${exam.body.id}/participants`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ memberId: candidate.body.id, gradeType: 'kyu', grade: 5 })
+      .expect(409);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/exam-participants/${participant.body.id}`)
+      .set('Authorization', `Bearer ${memberToken}`)
+      .send({ status: 'passed' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/exam-participants/${participant.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'passed' })
+      .expect(200)
+      .expect(({ body }) => expect(body.status).toBe('passed'));
+    await request(app.getHttpServer())
+      .patch('/api/v1/exam-participants/00000000-0000-4000-8000-000000000001')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ status: 'passed' })
+      .expect(404);
+    await request(app.getHttpServer())
+      .get('/api/v1/exams?page=1&pageSize=10')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+      .expect(({ body }) =>
+        expect(body.items).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: exam.body.id,
+              participants: expect.arrayContaining([
+                expect.objectContaining({ id: participant.body.id, status: 'passed' }),
+              ]),
+            }),
+          ]),
+        ),
+      );
+    const csv = await request(app.getHttpServer())
+      .get('/api/v1/exams/export.csv')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+      .expect('Content-Type', /text\/csv/);
+    expect(csv.text).toContain('Erika');
+    await request(app.getHttpServer())
+      .get('/api/v1/exams/export.xlsx')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+      .expect('Content-Type', /spreadsheetml/);
+    expect(
+      await dataSource.getRepository(AuditLog).countBy({
+        organizationId: organization.id,
+        action: 'exams.exported',
+      }),
+    ).toBeGreaterThanOrEqual(2);
+  });
+
   async function createUser(username: string, firstName: string, password: string): Promise<User> {
     return dataSource.getRepository(User).save({
       organizationId: organization.id,
