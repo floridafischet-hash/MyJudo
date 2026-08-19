@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../config/app_config.dart';
 
 import '../auth/auth_controller.dart';
 import '../chat/chat_page.dart';
@@ -28,6 +32,10 @@ class DashboardPage extends ConsumerStatefulWidget {
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   int _selectedIndex = 0;
   int _unreadMessages = 0;
+  int _newProjectsCount = 0;
+  Timer? _projectsTimer;
+  static const _storage = FlutterSecureStorage();
+  static const _projectsViewedKey = 'projects_last_viewed_at';
 
   void _setUnreadMessages(int value) {
     if (!mounted || value == _unreadMessages) return;
@@ -36,7 +44,65 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _scheduleProjectsCheck();
+  }
+
+  void _scheduleProjectsCheck() {
+    _projectsTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      final session = ref.read(authControllerProvider).value;
+      if (session != null) _checkNewProjects(session.accessToken);
+    });
+    // initial check after first frame so session is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final session = ref.read(authControllerProvider).value;
+      if (session != null) _checkNewProjects(session.accessToken);
+    });
+  }
+
+  Future<void> _checkNewProjects(String token) async {
+    try {
+      final storedStr = await _storage.read(key: _projectsViewedKey);
+      final lastViewed = storedStr != null
+          ? DateTime.tryParse(storedStr)
+          : null;
+      final dio = Dio(BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        headers: {'Authorization': 'Bearer $token'},
+      ));
+      final r = await dio.get<List<dynamic>>('/projects');
+      dio.close();
+      if (!mounted) return;
+      final projects = r.data ?? [];
+      if (lastViewed == null) return;
+      final count = projects.where((p) {
+        final raw = (p as Map)['updatedAt'];
+        if (raw == null) return false;
+        final updated = DateTime.tryParse(raw.toString());
+        return updated != null && updated.isAfter(lastViewed);
+      }).length;
+      if (count != _newProjectsCount) {
+        setState(() => _newProjectsCount = count);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _onDestinationSelected(int index, String? token) async {
+    setState(() => _selectedIndex = index);
+    if (index == 4) {
+      // Mark projects as viewed
+      await _storage.write(
+        key: _projectsViewedKey,
+        value: DateTime.now().toIso8601String(),
+      );
+      if (mounted) setState(() => _newProjectsCount = 0);
+    }
+  }
+
+  @override
   void dispose() {
+    _projectsTimer?.cancel();
     setMyJudoBrowserTitle(0);
     super.dispose();
   }
@@ -118,8 +184,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               labelBehavior:
                   NavigationDestinationLabelBehavior.onlyShowSelected,
               onDestinationSelected: (index) =>
-                  setState(() => _selectedIndex = index),
-              destinations: _destinationsWithUnread(),
+                  _onDestinationSelected(index, session?.accessToken),
+              destinations: _destinationsWithBadges(),
             ),
           );
         }
@@ -136,7 +202,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   minExtendedWidth: 286,
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: (index) =>
-                      setState(() => _selectedIndex = index),
+                      _onDestinationSelected(index, session?.accessToken),
                   indicatorColor: const Color(0xFF0B4F8A),
                   selectedIconTheme: const IconThemeData(
                     color: Colors.white,
@@ -178,7 +244,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       ),
                     ),
                   ),
-                  destinations: _destinationsWithUnread()
+                  destinations: _destinationsWithBadges()
                       .map(
                         (item) => NavigationRailDestination(
                           icon: item.icon,
@@ -199,20 +265,24 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  List<NavigationDestination> _destinationsWithUnread() => destinations
+  List<NavigationDestination> _destinationsWithBadges() => destinations
       .asMap()
       .entries
-      .map(
-        (entry) => entry.key == 2 && _unreadMessages > 0
-            ? NavigationDestination(
-                icon: Badge(
-                  label: Text('$_unreadMessages'),
-                  child: entry.value.icon,
-                ),
-                label: 'Kommunikation',
-              )
-            : entry.value,
-      )
+      .map((entry) {
+        if (entry.key == 2 && _unreadMessages > 0) {
+          return NavigationDestination(
+            icon: Badge(label: Text('$_unreadMessages'), child: entry.value.icon),
+            label: 'Kommunikation',
+          );
+        }
+        if (entry.key == 4 && _newProjectsCount > 0) {
+          return NavigationDestination(
+            icon: Badge(label: Text('$_newProjectsCount'), child: entry.value.icon),
+            label: 'Projekte',
+          );
+        }
+        return entry.value;
+      })
       .toList();
 }
 
@@ -260,8 +330,6 @@ class _Content extends ConsumerWidget {
           ),
         const SizedBox(height: 28),
         if (index == 0 && accessToken != null) ...[
-          HomeCalendarSummary(token: accessToken!, showActivity: false),
-          const SizedBox(height: 30),
           const Text(
             'Pinnwand',
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
@@ -270,6 +338,12 @@ class _Content extends ConsumerWidget {
           ProjectsPage(
             accessToken: accessToken!,
             canCreate: permissions.contains('roles.manage'),
+          ),
+          const SizedBox(height: 30),
+          HomeCalendarSummary(
+            token: accessToken!,
+            showActivity: false,
+            maxUpcoming: 3,
           ),
           const SizedBox(height: 34),
           const Text(
