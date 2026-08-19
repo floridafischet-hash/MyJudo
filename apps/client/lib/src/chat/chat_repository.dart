@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import '../training/training_models.dart';
 import 'chat_models.dart';
 
 class ChatApiException implements Exception {
@@ -90,6 +91,14 @@ class ChatRepository {
     }
   }
 
+  Future<void> deleteMessage(String chatId, String messageId) async {
+    try {
+      await _dio.delete<void>('/chats/$chatId/messages/$messageId');
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
   Future<ChatMessage> editMessage(String chatId, String messageId, String text) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
@@ -105,6 +114,65 @@ class ChatRepository {
   Future<void> markRead(String chatId) async {
     try {
       await _dio.post<void>('/chats/$chatId/read');
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<List<ChatSummary>> listAdminChats() async {
+    try {
+      final response = await _dio.get<List<dynamic>>('/chats/admin');
+      return (response.data ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(ChatSummary.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<List<TrainingGroup>> listAdminGroups() async {
+    try {
+      final response = await _dio.get<List<dynamic>>('/chats/admin/groups');
+      return (response.data ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(TrainingGroup.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<ChatSummary> saveManagedChat({
+    String? id,
+    required String title,
+    required String description,
+    required String icon,
+    required List<String> groupIds,
+    required bool archived,
+    required bool active,
+  }) async {
+    try {
+      final data = {
+        'title': title,
+        'description': description,
+        'icon': icon,
+        'groupIds': groupIds,
+        'archived': archived,
+        'active': active,
+      };
+      final response = id == null
+          ? await _dio.post<Map<String, dynamic>>('/chats/admin', data: data)
+          : await _dio.put<Map<String, dynamic>>('/chats/admin/$id', data: data);
+      return ChatSummary.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<void> deleteManagedChat(String id) async {
+    try {
+      await _dio.delete<void>('/chats/admin/$id');
     } on DioException catch (error) {
       throw ChatApiException(_messageFor(error));
     }

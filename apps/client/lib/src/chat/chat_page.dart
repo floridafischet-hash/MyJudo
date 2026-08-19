@@ -7,16 +7,27 @@ import 'chat_models.dart';
 import 'chat_repository.dart';
 import 'direct_chat_dialog.dart';
 
+IconData chatIcon(String? icon) => switch (icon) {
+  'forum' => Icons.forum_outlined,
+  'campaign' => Icons.campaign_outlined,
+  'sports' => Icons.sports_outlined,
+  'school' => Icons.school_outlined,
+  'shield' => Icons.shield_outlined,
+  _ => Icons.group_outlined,
+};
+
 class ChatPage extends StatefulWidget {
   const ChatPage({
     required this.accessToken,
     required this.currentUserId,
+    this.canDeleteAll = false,
     this.repository,
     super.key,
   });
 
   final String accessToken;
   final String currentUserId;
+  final bool canDeleteAll;
   final ChatRepository? repository;
 
   @override
@@ -188,6 +199,18 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  Future<void> _deleteMessage(ChatMessage message) async {
+    final selected = _selected;
+    if (selected == null) return;
+    try {
+      await _repository.deleteMessage(selected.id, message.id);
+      if (!mounted) return;
+      setState(() => _messages = _messages.where((m) => m.id != message.id).toList());
+    } on ChatApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
   Future<void> _editMessage(ChatMessage message, String newText) async {
     final selected = _selected;
     if (selected == null) return;
@@ -204,6 +227,7 @@ class _ChatPageState extends State<ChatPage> {
 
   void _showMessageActions(ChatMessage message) {
     final isOwn = message.senderId == widget.currentUserId;
+    final canDelete = isOwn || widget.canDeleteAll;
     showModalBottomSheet<void>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -218,17 +242,18 @@ class _ChatPageState extends State<ChatPage> {
                 setState(() => _replyingTo = message);
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.copy_outlined),
-              title: const Text('Kopieren'),
-              onTap: () {
-                Navigator.pop(ctx);
-                Clipboard.setData(ClipboardData(text: message.text));
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Nachricht kopiert')),
-                );
-              },
-            ),
+            if (message.text.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.copy_outlined),
+                title: const Text('Kopieren'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Clipboard.setData(ClipboardData(text: message.text));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nachricht kopiert')),
+                  );
+                },
+              ),
             if (isOwn)
               ListTile(
                 leading: const Icon(Icons.edit_outlined),
@@ -236,6 +261,15 @@ class _ChatPageState extends State<ChatPage> {
                 onTap: () {
                   Navigator.pop(ctx);
                   _showEditDialog(message);
+                },
+              ),
+            if (canDelete)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                title: const Text('Löschen', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  unawaited(_deleteMessage(message));
                 },
               ),
           ],

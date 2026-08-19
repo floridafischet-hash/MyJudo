@@ -12,6 +12,11 @@ class ChatSummary {
     required this.type,
     required this.title,
     required this.unreadCount,
+    this.description,
+    this.icon,
+    this.groupIds = const [],
+    this.archived = false,
+    this.active = true,
     this.lastMessage,
   });
 
@@ -20,6 +25,11 @@ class ChatSummary {
     type: ChatType.fromApi(json['type'] as String),
     title: json['title'] as String,
     unreadCount: json['unreadCount'] as int? ?? 0,
+    description: json['description'] as String?,
+    icon: json['icon'] as String?,
+    groupIds: (json['groupIds'] as List<dynamic>?)?.cast<String>() ?? const [],
+    archived: json['archived'] as bool? ?? false,
+    active: json['active'] as bool? ?? true,
     lastMessage: json['lastMessage'] is Map<String, dynamic>
         ? ChatMessage.fromJson(json['lastMessage'] as Map<String, dynamic>)
         : null,
@@ -28,6 +38,11 @@ class ChatSummary {
   final String id;
   final ChatType type;
   final String title;
+  final String? description;
+  final String? icon;
+  final List<String> groupIds;
+  final bool archived;
+  final bool active;
   final int unreadCount;
   final ChatMessage? lastMessage;
 }
