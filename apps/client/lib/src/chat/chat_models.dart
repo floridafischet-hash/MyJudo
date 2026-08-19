@@ -39,6 +39,9 @@ class ChatMessage {
     required this.senderName,
     required this.text,
     required this.createdAt,
+    this.editedAt,
+    this.replyToId,
+    this.replyToText,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -47,6 +50,11 @@ class ChatMessage {
     senderName: json['senderName'] as String,
     text: json['text'] as String,
     createdAt: DateTime.parse(json['createdAt'] as String),
+    editedAt: json['editedAt'] != null
+        ? DateTime.parse(json['editedAt'] as String)
+        : null,
+    replyToId: json['replyToId'] as String?,
+    replyToText: json['replyToText'] as String?,
   );
 
   final String id;
@@ -54,6 +62,22 @@ class ChatMessage {
   final String senderName;
   final String text;
   final DateTime createdAt;
+  final DateTime? editedAt;
+  final String? replyToId;
+  final String? replyToText;
+
+  bool get isEdited => editedAt != null;
+
+  ChatMessage copyWith({String? text, DateTime? editedAt}) => ChatMessage(
+    id: id,
+    senderId: senderId,
+    senderName: senderName,
+    text: text ?? this.text,
+    createdAt: createdAt,
+    editedAt: editedAt ?? this.editedAt,
+    replyToId: replyToId,
+    replyToText: replyToText,
+  );
 }
 
 class MessagePage {

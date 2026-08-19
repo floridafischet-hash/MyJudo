@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
@@ -9,6 +9,7 @@ import { ChatParticipant } from './chat-participant.entity';
 import { Chat, ChatType } from './chat.entity';
 import { CreateDirectChatDto } from './dto/create-direct-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { EditMessageDto } from './dto/edit-message.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
 import { Message } from './message.entity';
 
@@ -26,6 +27,9 @@ export interface MessageSummary {
   senderName: string;
   text: string;
   createdAt: Date;
+  editedAt: Date | null;
+  replyToId: string | null;
+  replyToText: string | null;
 }
 
 @Injectable()
@@ -154,15 +158,51 @@ export class ChatService {
     const chat = await this.assertAccess(actor, chatId);
     const text = dto.text.trim();
     if (!text) throw new BadRequestException('Die Nachricht darf nicht leer sein.');
+    let replyToId: string | null = null;
+    let replyToText: string | null = null;
+    if (dto.replyToId) {
+      const replied = await this.messages.findOne({
+        where: { id: dto.replyToId, chatId },
+        relations: { sender: true },
+      });
+      if (replied) {
+        replyToId = replied.id;
+        replyToText = replied.text.slice(0, 200);
+      }
+    }
     const message = await this.messages.save({
       chatId: chat.id,
       senderId: actor.id,
       text,
+      replyToId,
+      replyToText,
     });
     await this.touchParticipant(this.dataSource.manager, chat.id, actor.id, message.createdAt);
     const sender = await this.dataSource.getRepository(User).findOneByOrFail({ id: actor.id });
     message.sender = sender;
     return toMessageSummary(message);
+  }
+
+  async editMessage(
+    actor: AuthenticatedUser,
+    chatId: string,
+    messageId: string,
+    dto: EditMessageDto,
+  ): Promise<MessageSummary> {
+    await this.assertAccess(actor, chatId);
+    const message = await this.messages.findOne({
+      where: { id: messageId, chatId },
+      relations: { sender: true },
+    });
+    if (!message) throw new NotFoundException('Nachricht wurde nicht gefunden.');
+    if (message.senderId !== actor.id) throw new ForbiddenException('Nur eigene Nachrichten dürfen bearbeitet werden.');
+    const text = dto.text.trim();
+    if (!text) throw new BadRequestException('Die Nachricht darf nicht leer sein.');
+    message.text = text;
+    message.editedAt = new Date();
+    const saved = await this.messages.save(message);
+    saved.sender = message.sender;
+    return toMessageSummary(saved);
   }
 
   async markRead(actor: AuthenticatedUser, chatId: string): Promise<{ readAt: Date }> {
@@ -253,6 +293,9 @@ function toMessageSummary(message: Message): MessageSummary {
     senderName: displayName(message.sender),
     text: message.text,
     createdAt: message.createdAt,
+    editedAt: message.editedAt ?? null,
+    replyToId: message.replyToId ?? null,
+    replyToText: message.replyToText ?? null,
   };
 }
 

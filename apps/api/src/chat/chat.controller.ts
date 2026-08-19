@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -16,6 +17,7 @@ import { RequirePermissions } from '../rbac/permissions.decorator';
 import { ChatService, ChatSummary, MessageSummary } from './chat.service';
 import { CreateDirectChatDto } from './dto/create-direct-chat.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { EditMessageDto } from './dto/edit-message.dto';
 import { ListMessagesDto } from './dto/list-messages.dto';
 
 interface ChatRequest {
@@ -57,6 +59,16 @@ export class ChatController {
     @Body() dto: CreateMessageDto,
   ): Promise<MessageSummary> {
     return this.chats.send(request.user, id, dto);
+  }
+
+  @Patch(':id/messages/:messageId')
+  editMessage(
+    @Req() request: ChatRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('messageId', new ParseUUIDPipe({ version: '4' })) messageId: string,
+    @Body() dto: EditMessageDto,
+  ): Promise<MessageSummary> {
+    return this.chats.editMessage(request.user, id, messageId, dto);
   }
 
   @Post(':id/read')

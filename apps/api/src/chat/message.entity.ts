@@ -22,4 +22,13 @@ export class Message extends BaseEntity {
 
   @Column({ type: 'text' })
   text!: string;
+
+  @Column({ type: 'uuid', nullable: true, default: null })
+  replyToId!: string | null;
+
+  @Column({ type: 'text', nullable: true, default: null })
+  replyToText!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true, default: null })
+  editedAt!: Date | null;
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'chat_models.dart';
 import 'chat_repository.dart';
@@ -36,6 +37,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _loadingChats = true;
   bool _loadingMessages = false;
   bool _sending = false;
+  ChatMessage? _replyingTo;
 
   @override
   void initState() {
@@ -43,7 +45,7 @@ class _ChatPageState extends State<ChatPage> {
     unawaited(_loadChats());
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
-      (_) => unawaited(_loadChats(silent: true)),
+      (_) => unawaited(_pollUpdates()),
     );
   }
 
@@ -81,13 +83,48 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  // Polls only new messages since the last known message — no full list replace.
+  Future<void> _pollUpdates() async {
+    try {
+      final chats = await _repository.listChats();
+      if (!mounted) return;
+      final selectedId = _selected?.id;
+      setState(() {
+        _chats = chats;
+        _selected = selectedId == null
+            ? null
+            : chats.where((chat) => chat.id == selectedId).firstOrNull;
+      });
+      final selected = _selected;
+      if (selected == null || _messages.isEmpty) return;
+      // Fetch latest page and merge new messages without replacing the list.
+      final page = await _repository.listMessages(selected.id);
+      if (!mounted || _selected?.id != selected.id) return;
+      final existingIds = _messages.map((m) => m.id).toSet();
+      final incoming = page.items;
+      // Update edited messages and append genuinely new ones.
+      final updated = _messages.map((m) {
+        final replacement = incoming.where((i) => i.id == m.id).firstOrNull;
+        return replacement ?? m;
+      }).toList();
+      final newMessages = incoming.where((m) => !existingIds.contains(m.id)).toList();
+      if (newMessages.isNotEmpty || updated != _messages) {
+        setState(() => _messages = [...updated, ...newMessages]);
+        if (newMessages.isNotEmpty) _scrollToBottom();
+      }
+    } on ChatApiException {
+      // silent — don't show poll errors to the user
+    }
+  }
+
   Future<void> _loadMessages(ChatSummary chat) async {
     setState(() {
       _selected = chat;
       _loadingMessages = true;
-      _messages = const [];
+      // Do NOT clear _messages here; keep old content visible until new arrives.
       _nextBefore = null;
       _error = null;
+      _replyingTo = null;
     });
     try {
       final page = await _repository.listMessages(chat.id);
@@ -129,15 +166,19 @@ class _ChatPageState extends State<ChatPage> {
     final selected = _selected;
     final text = _messageController.text.trim();
     if (selected == null || text.isEmpty || _sending) return;
+    final replyToId = _replyingTo?.id;
     setState(() {
       _sending = true;
       _error = null;
     });
     try {
-      final message = await _repository.send(selected.id, text);
+      final message = await _repository.send(selected.id, text, replyToId: replyToId);
       if (!mounted) return;
       _messageController.clear();
-      setState(() => _messages = [..._messages, message]);
+      setState(() {
+        _messages = [..._messages, message];
+        _replyingTo = null;
+      });
       _scrollToBottom();
       unawaited(_loadChats(silent: true));
     } on ChatApiException catch (error) {
@@ -145,6 +186,93 @@ class _ChatPageState extends State<ChatPage> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _editMessage(ChatMessage message, String newText) async {
+    final selected = _selected;
+    if (selected == null) return;
+    try {
+      final updated = await _repository.editMessage(selected.id, message.id, newText);
+      if (!mounted) return;
+      setState(() {
+        _messages = _messages.map((m) => m.id == updated.id ? updated : m).toList();
+      });
+    } on ChatApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    }
+  }
+
+  void _showMessageActions(ChatMessage message) {
+    final isOwn = message.senderId == widget.currentUserId;
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.reply_outlined),
+              title: const Text('Antworten'),
+              onTap: () {
+                Navigator.pop(ctx);
+                setState(() => _replyingTo = message);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_outlined),
+              title: const Text('Kopieren'),
+              onTap: () {
+                Navigator.pop(ctx);
+                Clipboard.setData(ClipboardData(text: message.text));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Nachricht kopiert')),
+                );
+              },
+            ),
+            if (isOwn)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Bearbeiten'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditDialog(message);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(ChatMessage message) {
+    final controller = TextEditingController(text: message.text);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Nachricht bearbeiten'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 6,
+          minLines: 2,
+          maxLength: 4000,
+          decoration: const InputDecoration(counterText: ''),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          FilledButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isNotEmpty && text != message.text) {
+                unawaited(_editMessage(message, text));
+              }
+              Navigator.pop(ctx);
+            },
+            child: const Text('Speichern'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _newDirectChat() async {
@@ -189,9 +317,12 @@ class _ChatPageState extends State<ChatPage> {
             sending: _sending,
             canLoadOlder: _nextBefore != null,
             error: _error,
+            replyingTo: _replyingTo,
             onBack: () => setState(() => _selected = null),
             onLoadOlder: _loadOlder,
             onSend: _send,
+            onMessageLongPress: _showMessageActions,
+            onCancelReply: () => setState(() => _replyingTo = null),
           );
         }
         if (constraints.maxWidth < 720) {
@@ -226,8 +357,11 @@ class _ChatPageState extends State<ChatPage> {
                       sending: _sending,
                       canLoadOlder: _nextBefore != null,
                       error: _error,
+                      replyingTo: _replyingTo,
                       onLoadOlder: _loadOlder,
                       onSend: _send,
+                      onMessageLongPress: _showMessageActions,
+                      onCancelReply: () => setState(() => _replyingTo = null),
                     ),
             ),
           ],
@@ -312,8 +446,11 @@ class _Conversation extends StatelessWidget {
     required this.sending,
     required this.canLoadOlder,
     required this.error,
+    required this.replyingTo,
     required this.onLoadOlder,
     required this.onSend,
+    required this.onMessageLongPress,
+    required this.onCancelReply,
     this.onBack,
   });
 
@@ -326,8 +463,11 @@ class _Conversation extends StatelessWidget {
   final bool sending;
   final bool canLoadOlder;
   final String? error;
+  final ChatMessage? replyingTo;
   final VoidCallback onLoadOlder;
   final VoidCallback onSend;
+  final ValueChanged<ChatMessage> onMessageLongPress;
+  final VoidCallback onCancelReply;
   final VoidCallback? onBack;
 
   @override
@@ -369,44 +509,16 @@ class _Conversation extends StatelessWidget {
                   }
                   final message = messages[index - (canLoadOlder ? 1 : 0)];
                   final own = message.senderId == currentUserId;
-                  return Align(
-                    alignment: own
-                        ? Alignment.centerRight
-                        : Alignment.centerLeft,
-                    child: Card(
-                      color: own
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : null,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 520),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (!own)
-                                Text(
-                                  message.senderName,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.labelMedium,
-                                ),
-                              Text(message.text),
-                              const SizedBox(height: 4),
-                              Text(
-                                _time(message.createdAt),
-                                style: Theme.of(context).textTheme.labelSmall,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  return _MessageBubble(
+                    message: message,
+                    own: own,
+                    onLongPress: () => onMessageLongPress(message),
                   );
                 },
               ),
       ),
       const Divider(height: 1),
+      if (replyingTo != null) _ReplyBanner(message: replyingTo!, onCancel: onCancelReply),
       Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -441,6 +553,145 @@ class _Conversation extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({
+    required this.message,
+    required this.own,
+    required this.onLongPress,
+  });
+
+  final ChatMessage message;
+  final bool own;
+  final VoidCallback onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: own ? Alignment.centerRight : Alignment.centerLeft,
+      child: GestureDetector(
+        onLongPress: onLongPress,
+        child: Card(
+          color: own ? Theme.of(context).colorScheme.primaryContainer : null,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (!own)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        message.senderName,
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                  if (message.replyToText != null)
+                    _ReplyQuote(text: message.replyToText!),
+                  Text(message.text),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _time(message.createdAt),
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                      if (message.isEdited) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          'bearbeitet',
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReplyQuote extends StatelessWidget {
+  const _ReplyQuote({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(
+            color: Theme.of(context).colorScheme.primary,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    );
+  }
+}
+
+class _ReplyBanner extends StatelessWidget {
+  const _ReplyBanner({required this.message, required this.onCancel});
+  final ChatMessage message;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          const Icon(Icons.reply, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message.senderName,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                Text(
+                  message.text,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 18),
+            onPressed: onCancel,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ErrorView extends StatelessWidget {

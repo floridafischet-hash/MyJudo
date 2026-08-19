@@ -76,10 +76,24 @@ class ChatRepository {
     }
   }
 
-  Future<ChatMessage> send(String chatId, String text) async {
+  Future<ChatMessage> send(String chatId, String text, {String? replyToId}) async {
     try {
+      final data = <String, dynamic>{'text': text.trim()};
+      if (replyToId != null) data['replyToId'] = replyToId;
       final response = await _dio.post<Map<String, dynamic>>(
         '/chats/$chatId/messages',
+        data: data,
+      );
+      return ChatMessage.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<ChatMessage> editMessage(String chatId, String messageId, String text) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/chats/$chatId/messages/$messageId',
         data: {'text': text.trim()},
       );
       return ChatMessage.fromJson(response.data ?? const {});
