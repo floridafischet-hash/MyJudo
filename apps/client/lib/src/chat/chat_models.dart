@@ -42,6 +42,7 @@ class ChatMessage {
     this.editedAt,
     this.replyToId,
     this.replyToText,
+    this.imageUrl,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
@@ -55,6 +56,7 @@ class ChatMessage {
         : null,
     replyToId: json['replyToId'] as String?,
     replyToText: json['replyToText'] as String?,
+    imageUrl: json['imageUrl'] as String?,
   );
 
   final String id;
@@ -65,6 +67,7 @@ class ChatMessage {
   final DateTime? editedAt;
   final String? replyToId;
   final String? replyToText;
+  final String? imageUrl;
 
   bool get isEdited => editedAt != null;
 
@@ -77,6 +80,7 @@ class ChatMessage {
     editedAt: editedAt ?? this.editedAt,
     replyToId: replyToId,
     replyToText: replyToText,
+    imageUrl: imageUrl,
   );
 }
 
