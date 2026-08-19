@@ -120,7 +120,8 @@ class _ChatPageState extends State<ChatPage> {
       }).toList();
       final newMessages = incoming.where((m) => !existingIds.contains(m.id)).toList();
       if (newMessages.isNotEmpty || updated != _messages) {
-        setState(() => _messages = [...updated, ...newMessages]);
+        // Prepend new messages (list is DESC: newest first).
+        setState(() => _messages = [...newMessages, ...updated]);
         if (newMessages.isNotEmpty) _scrollToBottom();
       }
     } on ChatApiException {
@@ -163,7 +164,7 @@ class _ChatPageState extends State<ChatPage> {
       final page = await _repository.listMessages(selected.id, before: before);
       if (!mounted || _selected?.id != selected.id) return;
       setState(() {
-        _messages = [...page.items, ..._messages];
+        _messages = [..._messages, ...page.items];
         _nextBefore = page.nextBefore;
       });
     } on ChatApiException catch (error) {
@@ -187,7 +188,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       _messageController.clear();
       setState(() {
-        _messages = [..._messages, message];
+        _messages = [message, ..._messages];
         _replyingTo = null;
       });
       _scrollToBottom();
@@ -323,11 +324,7 @@ class _ChatPageState extends State<ChatPage> {
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
+        _scrollController.jumpTo(0);
       }
     });
   }
@@ -530,10 +527,13 @@ class _Conversation extends StatelessWidget {
             ? const Center(child: Text('Noch keine Nachrichten.'))
             : ListView.builder(
                 controller: scrollController,
+                reverse: true,
                 padding: const EdgeInsets.all(16),
                 itemCount: messages.length + (canLoadOlder ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (canLoadOlder && index == 0) {
+                  // API returns DESC (newest first). reverse:true renders index 0 at bottom.
+                  // So messages[0] (newest) is at bottom, load-older button at top.
+                  if (index == messages.length) {
                     return Center(
                       child: TextButton(
                         onPressed: loading ? null : onLoadOlder,
@@ -541,7 +541,7 @@ class _Conversation extends StatelessWidget {
                       ),
                     );
                   }
-                  final message = messages[index - (canLoadOlder ? 1 : 0)];
+                  final message = messages[index];
                   final own = message.senderId == currentUserId;
                   return _MessageBubble(
                     message: message,
