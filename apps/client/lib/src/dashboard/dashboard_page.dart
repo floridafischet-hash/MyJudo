@@ -3,11 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_controller.dart';
 import '../chat/chat_page.dart';
-import '../calendar/calendar_page.dart';
-import '../exams/exam_page.dart';
+import '../chat/chat_admin_page.dart';
 import '../members/member_list_page.dart';
-import '../polls/poll_page.dart';
+import '../members/member_excel_import_page.dart';
 import '../users/pending_users_page.dart';
+import '../training/training_page.dart';
+import '../users/user_management_page.dart';
+import '../notifications/chat_notification_monitor.dart';
+import '../notifications/notification_settings_page.dart';
+import '../projects/projects_page.dart';
+import '../downloads/downloads_page.dart';
+import '../browser_title/browser_title.dart';
+import '../calendar/home_calendar_summary.dart';
+import '../calendar/calendar_reminder_monitor.dart';
+import '../audit/audit_log_page.dart';
 
 class DashboardPage extends ConsumerStatefulWidget {
   const DashboardPage({super.key});
@@ -18,6 +27,19 @@ class DashboardPage extends ConsumerStatefulWidget {
 
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   int _selectedIndex = 0;
+  int _unreadMessages = 0;
+
+  void _setUnreadMessages(int value) {
+    if (!mounted || value == _unreadMessages) return;
+    setState(() => _unreadMessages = value);
+    setMyJudoBrowserTitle(value);
+  }
+
+  @override
+  void dispose() {
+    setMyJudoBrowserTitle(0);
+    super.dispose();
+  }
 
   static const destinations = [
     NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
@@ -34,6 +56,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       label: 'Mitglieder & Prüfungen',
     ),
     NavigationDestination(
+      icon: Icon(Icons.dashboard_outlined),
+      label: 'Projekte',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.download_outlined),
+      label: 'Downloads',
+    ),
+    NavigationDestination(
       icon: Icon(Icons.settings_outlined),
       label: 'Einstellungen',
     ),
@@ -46,12 +76,27 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         final desktop = constraints.maxWidth >= 900;
         final extended = constraints.maxWidth >= 1200;
         final session = ref.watch(authControllerProvider).value;
-        final content = _Content(
-          index: _selectedIndex,
-          accessToken: session?.accessToken,
-          currentUserId: session?.userId,
-          permissions: session?.permissions ?? const {},
-          greetingName: session?.greetingName ?? '',
+        final content = Stack(
+          children: [
+            _Content(
+              index: _selectedIndex,
+              accessToken: session?.accessToken,
+              currentUserId: session?.userId,
+              permissions: session?.permissions ?? const {},
+              greetingName: session?.greetingName ?? '',
+              isSuperuser: session?.isSuperuser ?? false,
+            ),
+            if (session != null &&
+                session.permissions.contains('chat.general.access'))
+              ChatNotificationMonitor(
+                accessToken: session.accessToken,
+                currentUserId: session.userId,
+                chatIsOpen: _selectedIndex == 2,
+                onUnreadChanged: _setUnreadMessages,
+              ),
+            if (session != null)
+              CalendarReminderMonitor(token: session.accessToken),
+          ],
         );
         if (!desktop) {
           return Scaffold(
@@ -70,9 +115,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             body: content,
             bottomNavigationBar: NavigationBar(
               selectedIndex: _selectedIndex,
+              labelBehavior:
+                  NavigationDestinationLabelBehavior.onlyShowSelected,
               onDestinationSelected: (index) =>
                   setState(() => _selectedIndex = index),
-              destinations: destinations,
+              destinations: _destinationsWithUnread(),
             ),
           );
         }
@@ -80,44 +127,44 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           body: Row(
             children: [
               Container(
-                width: extended ? 372 : 135,
-                color: const Color(0xFF201D1A),
+                width: extended ? 286 : 104,
+                color: const Color(0xFF082D4B),
                 child: NavigationRail(
                   backgroundColor: Colors.transparent,
                   extended: extended,
-                  minWidth: 135,
-                  minExtendedWidth: 372,
+                  minWidth: 104,
+                  minExtendedWidth: 286,
                   selectedIndex: _selectedIndex,
                   onDestinationSelected: (index) =>
                       setState(() => _selectedIndex = index),
-                  indicatorColor: const Color(0xFF9E2A2B),
+                  indicatorColor: const Color(0xFF0B4F8A),
                   selectedIconTheme: const IconThemeData(
                     color: Colors.white,
-                    size: 36,
+                    size: 28,
                   ),
                   unselectedIconTheme: const IconThemeData(
                     color: Color(0xFFD8CDC0),
-                    size: 35,
+                    size: 27,
                   ),
                   selectedLabelTextStyle: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,
-                    fontSize: 21,
+                    fontSize: 16,
                   ),
                   unselectedLabelTextStyle: const TextStyle(
                     color: Color(0xFFEAE1D6),
                     fontWeight: FontWeight.w500,
-                    fontSize: 21,
+                    fontSize: 16,
                   ),
                   leading: const Padding(
-                    padding: EdgeInsets.fromLTRB(23, 34, 23, 39),
+                    padding: EdgeInsets.fromLTRB(18, 26, 18, 30),
                     child: _Brand(),
                   ),
                   trailing: Expanded(
                     child: Align(
                       alignment: Alignment.bottomCenter,
                       child: Padding(
-                        padding: const EdgeInsets.only(bottom: 26),
+                        padding: const EdgeInsets.only(bottom: 20),
                         child: IconButton(
                           tooltip: 'Abmelden',
                           onPressed: () => ref
@@ -126,18 +173,17 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                           icon: const Icon(
                             Icons.logout,
                             color: Color(0xFFEAE1D6),
-                            size: 31,
                           ),
                         ),
                       ),
                     ),
                   ),
-                  destinations: destinations
+                  destinations: _destinationsWithUnread()
                       .map(
                         (item) => NavigationRailDestination(
                           icon: item.icon,
                           label: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 17),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
                             child: Text(item.label),
                           ),
                         ),
@@ -152,6 +198,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       },
     );
   }
+
+  List<NavigationDestination> _destinationsWithUnread() => destinations
+      .asMap()
+      .entries
+      .map(
+        (entry) => entry.key == 2 && _unreadMessages > 0
+            ? NavigationDestination(
+                icon: Badge(
+                  label: Text('$_unreadMessages'),
+                  child: entry.value.icon,
+                ),
+                label: 'Kommunikation',
+              )
+            : entry.value,
+      )
+      .toList();
 }
 
 class _Content extends ConsumerWidget {
@@ -161,12 +223,14 @@ class _Content extends ConsumerWidget {
     required this.currentUserId,
     required this.permissions,
     required this.greetingName,
+    required this.isSuperuser,
   });
   final int index;
   final String? accessToken;
   final String? currentUserId;
   final Set<String> permissions;
   final String greetingName;
+  final bool isSuperuser;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -175,6 +239,8 @@ class _Content extends ConsumerWidget {
       'Kalender & Training',
       'Chat & Kommunikation',
       'Mitglieder & Prüfungen',
+      'Pinnwand & Projekte',
+      'Downloads',
       'Einstellungen',
     ];
     return ListView(
@@ -193,20 +259,37 @@ class _Content extends ConsumerWidget {
             ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
         const SizedBox(height: 28),
-        if (index == 0)
-          const _DashboardOverview()
-        else if (index == 1 &&
-            accessToken != null &&
-            permissions.contains('calendar.view'))
-          SizedBox(
-            height: MediaQuery.sizeOf(context).height - 145,
-            child: Card(
-              clipBehavior: Clip.antiAlias,
-              child: CalendarPage(
-                accessToken: accessToken!,
-                permissions: permissions,
-              ),
-            ),
+        if (index == 0 && accessToken != null) ...[
+          HomeCalendarSummary(token: accessToken!, showActivity: false),
+          const SizedBox(height: 30),
+          const Text(
+            'Pinnwand',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          ProjectsPage(
+            accessToken: accessToken!,
+            canCreate: permissions.contains('roles.manage'),
+          ),
+          const SizedBox(height: 34),
+          const Text(
+            'Kalender',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 14),
+          TrainingPage(
+            accessToken: accessToken!,
+            canManage: permissions.contains('training.manage'),
+            embedded: true,
+            showCalendar: true,
+            calendarOnly: true,
+          ),
+        ] else if (index == 1 && accessToken != null)
+          TrainingPage(
+            accessToken: accessToken!,
+            canManage: permissions.contains('training.manage'),
+            embedded: true,
+            showCalendar: true,
           )
         else if (index == 2 &&
             accessToken != null &&
@@ -216,48 +299,17 @@ class _Content extends ConsumerWidget {
             height: MediaQuery.sizeOf(context).height - 145,
             child: Card(
               clipBehavior: Clip.antiAlias,
-              child: DefaultTabController(
-                length: permissions.contains('polls.vote') ? 2 : 1,
-                child: Column(
-                  children: [
-                    TabBar(
-                      tabs: [
-                        const Tab(
-                          icon: Icon(Icons.forum_outlined),
-                          text: 'Chat',
-                        ),
-                        if (permissions.contains('polls.vote'))
-                          const Tab(
-                            icon: Icon(Icons.poll_outlined),
-                            text: 'Umfragen',
-                          ),
-                      ],
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        children: [
-                          ChatPage(
-                            accessToken: accessToken!,
-                            currentUserId: currentUserId!,
-                          ),
-                          if (permissions.contains('polls.vote'))
-                            PollPage(
-                              accessToken: accessToken!,
-                              permissions: permissions,
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
+              child: ChatPage(
+                accessToken: accessToken!,
+                currentUserId: currentUserId!,
+                canDeleteAll: isSuperuser,
               ),
             ),
           )
         else if (index == 3 &&
             accessToken != null &&
             (permissions.contains('users.approve') ||
-                permissions.contains('members.view') ||
-                permissions.contains('exams.view'))) ...[
+                permissions.contains('members.view'))) ...[
           if (permissions.contains('members.view')) ...[
             Text('Mitglieder', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
@@ -266,19 +318,6 @@ class _Content extends ConsumerWidget {
               child: MemberListPage(
                 accessToken: accessToken!,
                 permissions: permissions,
-              ),
-            ),
-          ],
-          if (permissions.contains('exams.view')) ...[
-            const SizedBox(height: 28),
-            SizedBox(
-              height: 520,
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                child: ExamPage(
-                  accessToken: accessToken!,
-                  permissions: permissions,
-                ),
               ),
             ),
           ],
@@ -294,109 +333,35 @@ class _Content extends ConsumerWidget {
               child: PendingUsersPage(accessToken: accessToken!),
             ),
           ],
-        ] else if (index == 4)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.tonalIcon(
-              onPressed: () =>
-                  ref.read(authControllerProvider.notifier).logout(),
-              icon: const Icon(Icons.logout),
-              label: const Text('Abmelden'),
-            ),
+        ] else if (index == 4 && accessToken != null)
+          ProjectsPage(
+            accessToken: accessToken!,
+            canCreate: permissions.contains('roles.manage'),
           )
-        else
+        else if (index == 5 && accessToken != null)
+          DownloadsPage(
+            token: accessToken!,
+            admin: permissions.contains('roles.manage'),
+          )
+        else if (index == 6 && accessToken != null) ...[
+          NotificationSettingsPage(accessToken: accessToken!),
+          const SizedBox(height: 28),
+          HomeCalendarSummary(token: accessToken!, showUpcoming: false),
+          if (permissions.contains('roles.manage')) ...[
+            const SizedBox(height: 28),
+            ChatAdminPage(accessToken: accessToken!),
+            const SizedBox(height: 28),
+            UserManagementPage(accessToken: accessToken!, embedded: true),
+            const SizedBox(height: 28),
+            MemberExcelImportPage(accessToken: accessToken!),
+          ],
+          if (isSuperuser) ...[
+            const SizedBox(height: 28),
+            AuditLogPage(accessToken: accessToken!),
+          ],
+        ] else
           const _ModuleInProgress(),
       ],
-    );
-  }
-}
-
-class _DashboardOverview extends StatelessWidget {
-  const _DashboardOverview();
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth >= 980
-            ? (constraints.maxWidth - 40) / 3
-            : constraints.maxWidth >= 620
-            ? (constraints.maxWidth - 20) / 2
-            : constraints.maxWidth;
-        return Wrap(
-          spacing: 20,
-          runSpacing: 20,
-          children: [
-            _StatusCard(
-              width: width,
-              icon: Icons.event_available_rounded,
-              title: 'Nächste Termine',
-              body: 'Deine kommenden Trainings und Vereinstermine.',
-            ),
-            _StatusCard(
-              width: width,
-              icon: Icons.notifications_none_rounded,
-              title: 'Benachrichtigungen',
-              body: 'Wichtige Neuigkeiten erscheinen gesammelt hier.',
-            ),
-            _StatusCard(
-              width: width,
-              icon: Icons.bolt_rounded,
-              title: 'Schnellzugriffe',
-              body: 'Direkter Einstieg in deine häufigsten Bereiche.',
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.width,
-    required this.icon,
-    required this.title,
-    required this.body,
-  });
-  final double width;
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF3E4E1),
-                  shape: BoxShape.circle,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(11),
-                  child: Icon(icon, color: const Color(0xFF9E2A2B)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 9),
-              Text(body, style: Theme.of(context).textTheme.bodyLarge),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -411,12 +376,12 @@ class _WelcomeHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
       decoration: BoxDecoration(
-        color: const Color(0xFF201D1A),
+        color: const Color(0xFF082D4B),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
         children: [
-          Container(width: 5, height: 62, color: const Color(0xFF9E2A2B)),
+          Container(width: 5, height: 62, color: const Color(0xFF52A9D8)),
           const SizedBox(width: 20),
           Expanded(
             child: Column(
@@ -439,7 +404,7 @@ class _WelcomeHeader extends StatelessWidget {
               ],
             ),
           ),
-          const Icon(Icons.circle, color: Color(0xFF9E2A2B), size: 18),
+          const Icon(Icons.circle, color: Color(0xFF52A9D8), size: 18),
         ],
       ),
     );
@@ -477,36 +442,31 @@ class _Brand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final name = Text(
+      'Kodokan OHZ',
+      style: TextStyle(
+        color: compact ? const Color(0xFF25221E) : Colors.white,
+        fontWeight: FontWeight.w800,
+        fontSize: compact ? 20 : 24,
+      ),
+    );
+    final logo = Image.asset(
+      'assets/kodokan_osterholz_display.png',
+      width: compact ? 42 : 144,
+      height: compact ? 42 : 144,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.high,
+      isAntiAlias: true,
+    );
+    if (compact) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [logo, const SizedBox(width: 11), name],
+      );
+    }
+    return Column(
       mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: compact ? 34 : 55,
-          height: compact ? 34 : 55,
-          alignment: Alignment.center,
-          decoration: const BoxDecoration(
-            color: Color(0xFF9E2A2B),
-            shape: BoxShape.circle,
-          ),
-          child: Text(
-            '柔',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: compact ? 18 : 27,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        SizedBox(width: compact ? 11 : 14),
-        Text(
-          'MyJudo',
-          style: TextStyle(
-            color: compact ? const Color(0xFF25221E) : Colors.white,
-            fontWeight: FontWeight.w800,
-            fontSize: compact ? 20 : 31,
-          ),
-        ),
-      ],
+      children: [name, const SizedBox(height: 12), logo],
     );
   }
 }
