@@ -143,7 +143,6 @@ class _ChatPageState extends State<ChatPage> {
     });
     try {
       final page = await _repository.listMessages(chat.id);
-      await _repository.markRead(chat.id);
       if (!mounted || _selected?.id != chat.id) return;
       setState(() {
         _messages = page.items;
@@ -151,6 +150,7 @@ class _ChatPageState extends State<ChatPage> {
       });
       _scrollToBottom();
       unawaited(_loadChats(silent: true));
+      unawaited(_repository.markRead(chat.id).catchError((_) {}));
     } on ChatApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     } finally {

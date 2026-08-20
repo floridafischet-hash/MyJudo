@@ -64,7 +64,7 @@ class ChatMessage {
     id: json['id'] as String,
     senderId: json['senderId'] as String,
     senderName: json['senderName'] as String,
-    text: json['text'] as String,
+    text: json['text'] as String? ?? '',
     createdAt: DateTime.parse(json['createdAt'] as String),
     editedAt: json['editedAt'] != null
         ? DateTime.parse(json['editedAt'] as String)
