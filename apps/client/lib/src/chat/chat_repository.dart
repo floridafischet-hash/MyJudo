@@ -71,7 +71,7 @@ class ChatRepository {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/chats/$chatId/messages',
-        queryParameters: {'before': before, 'limit': 50},
+        queryParameters: chatMessageQueryParameters(before),
       );
       return MessagePage.fromJson(response.data ?? const {});
     } on DioException catch (error) {
@@ -79,7 +79,11 @@ class ChatRepository {
     }
   }
 
-  Future<ChatMessage> send(String chatId, String text, {String? replyToId}) async {
+  Future<ChatMessage> send(
+    String chatId,
+    String text, {
+    String? replyToId,
+  }) async {
     try {
       final data = <String, dynamic>{'text': text.trim()};
       if (replyToId != null) data['replyToId'] = replyToId;
@@ -125,7 +129,11 @@ class ChatRepository {
     }
   }
 
-  Future<ChatMessage> editMessage(String chatId, String messageId, String text) async {
+  Future<ChatMessage> editMessage(
+    String chatId,
+    String messageId,
+    String text,
+  ) async {
     try {
       final response = await _dio.patch<Map<String, dynamic>>(
         '/chats/$chatId/messages/$messageId',
@@ -189,7 +197,10 @@ class ChatRepository {
       };
       final response = id == null
           ? await _dio.post<Map<String, dynamic>>('/chats/admin', data: data)
-          : await _dio.put<Map<String, dynamic>>('/chats/admin/$id', data: data);
+          : await _dio.put<Map<String, dynamic>>(
+              '/chats/admin/$id',
+              data: data,
+            );
       return ChatSummary.fromJson(response.data ?? const {});
     } on DioException catch (error) {
       throw ChatApiException(_messageFor(error));
@@ -220,6 +231,11 @@ class ChatRepository {
     if (_ownsDio) _dio.close();
   }
 }
+
+Map<String, dynamic> chatMessageQueryParameters(String? before) => {
+  'limit': 50,
+  if (before != null && before.isNotEmpty) 'before': before,
+};
 
 String _messageFor(DioException error) => switch (error.response?.statusCode) {
   403 || 404 => 'Dieser Chat ist nicht mehr verfügbar.',

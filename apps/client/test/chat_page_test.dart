@@ -148,7 +148,11 @@ class _FakeChatRepository extends ChatRepository {
   }
 
   @override
-  Future<ChatMessage> send(String chatId, String text) async {
+  Future<ChatMessage> send(
+    String chatId,
+    String text, {
+    String? replyToId,
+  }) async {
     sentText = text;
     return ChatMessage(
       id: 'message-2',
