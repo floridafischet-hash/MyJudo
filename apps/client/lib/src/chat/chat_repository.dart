@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
@@ -69,7 +71,7 @@ class ChatRepository {
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         '/chats/$chatId/messages',
-        queryParameters: {if (before != null) 'before': before, 'limit': 50},
+        queryParameters: {'before': before, 'limit': 50},
       );
       return MessagePage.fromJson(response.data ?? const {});
     } on DioException catch (error) {
@@ -84,6 +86,29 @@ class ChatRepository {
       final response = await _dio.post<Map<String, dynamic>>(
         '/chats/$chatId/messages',
         data: data,
+      );
+      return ChatMessage.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<ChatMessage> sendImage(
+    String chatId,
+    Uint8List bytes,
+    String filename, {
+    String? text,
+    String? replyToId,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'image': MultipartFile.fromBytes(bytes, filename: filename),
+        'text': (text != null && text.isNotEmpty) ? text : null,
+        'replyToId': replyToId,
+      });
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/chats/$chatId/images',
+        data: formData,
       );
       return ChatMessage.fromJson(response.data ?? const {});
     } on DioException catch (error) {
@@ -173,6 +198,18 @@ class ChatRepository {
   Future<void> deleteManagedChat(String id) async {
     try {
       await _dio.delete<void>('/chats/admin/$id');
+    } on DioException catch (error) {
+      throw ChatApiException(_messageFor(error));
+    }
+  }
+
+  Future<Uint8List> fetchImageBytes(String path) async {
+    try {
+      final response = await _dio.get<List<int>>(
+        path,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return Uint8List.fromList(response.data ?? const []);
     } on DioException catch (error) {
       throw ChatApiException(_messageFor(error));
     }
