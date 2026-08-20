@@ -1,4 +1,3 @@
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myjudo_client/src/chat/chat_models.dart';
@@ -99,15 +98,11 @@ void main() {
 
     await tester.tap(find.byTooltip('Emoji'));
     await tester.pumpAndSettle();
-    expect(find.byType(EmojiPicker), findsOneWidget);
+    expect(find.byKey(const Key('chat-emoji-grid')), findsOneWidget);
     expect(find.text('Emoji auswählen'), findsOneWidget);
     expect(find.text('Fertig'), findsOneWidget);
     expect(find.text('Senden'), findsOneWidget);
-    final picker = tester.widget<EmojiPicker>(find.byType(EmojiPicker));
-    picker.onEmojiSelected!(
-      Category.SMILEYS,
-      const Emoji('😀', 'grinning face'),
-    );
+    await tester.tap(find.byKey(const ValueKey('chat-emoji-😀')));
     await tester.pump();
     await tester.tap(find.text('Senden'));
     await tester.pumpAndSettle();

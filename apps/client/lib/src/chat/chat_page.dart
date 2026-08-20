@@ -1,9 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -20,6 +18,146 @@ IconData chatIcon(String? icon) => switch (icon) {
   'shield' => Icons.shield_outlined,
   _ => Icons.group_outlined,
 };
+
+const _chatEmojis = <String>[
+  '😀',
+  '😃',
+  '😄',
+  '😁',
+  '😆',
+  '😅',
+  '😂',
+  '🤣',
+  '😊',
+  '😇',
+  '🙂',
+  '🙃',
+  '😉',
+  '😌',
+  '😍',
+  '🥰',
+  '😘',
+  '😋',
+  '😎',
+  '🤩',
+  '🥳',
+  '😏',
+  '😒',
+  '😔',
+  '😢',
+  '😭',
+  '😤',
+  '😡',
+  '🤯',
+  '😳',
+  '🥺',
+  '😴',
+  '🤔',
+  '🤭',
+  '🤫',
+  '🤗',
+  '🫡',
+  '🫶',
+  '🙏',
+  '💪',
+  '👍',
+  '👎',
+  '👏',
+  '🙌',
+  '🤝',
+  '👌',
+  '✌️',
+  '🤞',
+  '👋',
+  '🤟',
+  '🤙',
+  '💚',
+  '❤️',
+  '🧡',
+  '💛',
+  '💙',
+  '💜',
+  '🖤',
+  '🤍',
+  '💔',
+  '❣️',
+  '💕',
+  '💯',
+  '✨',
+  '🔥',
+  '🎉',
+  '🎊',
+  '🎂',
+  '🎁',
+  '🏆',
+  '🥇',
+  '⭐',
+  '✅',
+  '❌',
+  '⚠️',
+  '💡',
+  '📌',
+  '📷',
+  '📅',
+  '💬',
+  '🥋',
+  '🏅',
+  '🤼',
+  '🏃',
+  '⚽',
+  '🏀',
+  '🚴',
+  '🏋️',
+  '☀️',
+  '🌤️',
+  '🌧️',
+  '❄️',
+  '🌈',
+  '🌙',
+  '🌍',
+  '🍀',
+  '🍎',
+  '🍕',
+  '🍰',
+  '☕',
+  '🥤',
+  '🍻',
+  '🚗',
+  '🏠',
+];
+
+class _EmojiGrid extends StatelessWidget {
+  const _EmojiGrid({required this.onSelected});
+
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) => GridView.builder(
+    key: const Key('chat-emoji-grid'),
+    padding: const EdgeInsets.all(12),
+    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+      maxCrossAxisExtent: 52,
+      mainAxisSpacing: 4,
+      crossAxisSpacing: 4,
+    ),
+    itemCount: _chatEmojis.length,
+    itemBuilder: (context, index) {
+      final emoji = _chatEmojis[index];
+      return Semantics(
+        button: true,
+        label: 'Emoji $emoji',
+        child: InkWell(
+          key: ValueKey('chat-emoji-$emoji'),
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => onSelected(emoji),
+          child: Center(
+            child: Text(emoji, style: const TextStyle(fontSize: 28)),
+          ),
+        ),
+      );
+    },
+  );
+}
 
 class ChatPage extends StatefulWidget {
   const ChatPage({
@@ -455,25 +593,7 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               ),
               const Divider(height: 1),
-              Expanded(
-                child: EmojiPicker(
-                  onEmojiSelected: _onEmojiSelected,
-                  config: Config(
-                    height: 360,
-                    emojiViewConfig: EmojiViewConfig(
-                      emojiSizeMax:
-                          28 *
-                          (foundation.defaultTargetPlatform ==
-                                  TargetPlatform.iOS
-                              ? 1.2
-                              : 1.0),
-                    ),
-                    bottomActionBarConfig: const BottomActionBarConfig(
-                      enabled: false,
-                    ),
-                  ),
-                ),
-              ),
+              Expanded(child: _EmojiGrid(onSelected: _onEmojiSelected)),
             ],
           ),
         ),
@@ -484,21 +604,21 @@ class _ChatPageState extends State<ChatPage> {
     if (sendAfterSelection == true) await _send();
   }
 
-  void _onEmojiSelected(Category? category, Emoji emoji) {
+  void _onEmojiSelected(String emoji) {
     final controller = _messageController;
     final text = controller.text;
     final selection = controller.selection;
     final newText = text.replaceRange(
       selection.start < 0 ? text.length : selection.start,
       selection.end < 0 ? text.length : selection.end,
-      emoji.emoji,
+      emoji,
     );
     controller.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(
         offset:
             (selection.start < 0 ? text.length : selection.start) +
-            emoji.emoji.length,
+            emoji.length,
       ),
     );
   }
