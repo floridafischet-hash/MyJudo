@@ -100,8 +100,18 @@ void main() {
     await tester.tap(find.byTooltip('Emoji'));
     await tester.pumpAndSettle();
     expect(find.byType(EmojiPicker), findsOneWidget);
-    await tester.tap(find.byType(ModalBarrier).last);
+    expect(find.text('Emoji auswählen'), findsOneWidget);
+    expect(find.text('Fertig'), findsOneWidget);
+    expect(find.text('Senden'), findsOneWidget);
+    final picker = tester.widget<EmojiPicker>(find.byType(EmojiPicker));
+    picker.onEmojiSelected!(
+      Category.SMILEYS,
+      const Emoji('😀', 'grinning face'),
+    );
+    await tester.pump();
+    await tester.tap(find.text('Senden'));
     await tester.pumpAndSettle();
+    expect(repository.sentText, '😀');
 
     await tester.tap(find.text('Willkommen').last);
     await tester.pumpAndSettle();

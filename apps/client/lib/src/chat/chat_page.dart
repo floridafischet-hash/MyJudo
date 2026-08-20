@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../config/app_config.dart';
 import 'chat_models.dart';
@@ -54,7 +54,6 @@ class _ChatPageState extends State<ChatPage> {
   bool _sending = false;
   ChatMessage? _replyingTo;
   bool _emojiPickerVisible = false;
-  final _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -225,24 +224,35 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _pickAndSendImage() async {
     final selected = _selected;
     if (selected == null || _sending) return;
-    final picked = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-      maxWidth: 1920,
-      maxHeight: 1920,
-    );
-    if (picked == null || !mounted) return;
-    final bytes = await picked.readAsBytes();
-    final caption = _messageController.text.trim();
-    setState(() {
-      _sending = true;
-      _error = null;
-    });
     try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+        allowMultiple: false,
+        withData: true,
+      );
+      if (result == null || !mounted) return;
+      final file = result.files.single;
+      final bytes = file.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        throw const ChatApiException(
+          'Das ausgewählte Bild konnte nicht gelesen werden.',
+        );
+      }
+      if (bytes.length > 10 * 1024 * 1024) {
+        throw const ChatApiException(
+          'Das Bild ist zu groß. Maximal erlaubt sind 10 MB.',
+        );
+      }
+      final caption = _messageController.text.trim();
+      setState(() {
+        _sending = true;
+        _error = null;
+      });
       final message = await _repository.sendImage(
         selected.id,
         bytes,
-        picked.name,
+        file.name,
         text: caption.isNotEmpty ? caption : null,
         replyToId: _replyingTo?.id,
       );
@@ -257,6 +267,10 @@ class _ChatPageState extends State<ChatPage> {
       unawaited(_loadChats(silent: true));
     } on ChatApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Das Bild konnte nicht ausgewählt werden.');
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -409,32 +423,65 @@ class _ChatPageState extends State<ChatPage> {
     if (_emojiPickerVisible) return;
     FocusScope.of(context).unfocus();
     setState(() => _emojiPickerVisible = true);
-    await showModalBottomSheet<void>(
+    final sendAfterSelection = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (context) => SafeArea(
         child: SizedBox(
-          height: 360,
-          child: EmojiPicker(
-            onEmojiSelected: _onEmojiSelected,
-            config: Config(
-              height: 360,
-              emojiViewConfig: EmojiViewConfig(
-                emojiSizeMax:
-                    28 *
-                    (foundation.defaultTargetPlatform == TargetPlatform.iOS
-                        ? 1.2
-                        : 1.0),
+          height: 420,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                child: Row(
+                  children: [
+                    const Expanded(child: Text('Emoji auswählen')),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Fertig'),
+                    ),
+                    const SizedBox(width: 4),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _messageController,
+                      builder: (context, value, child) => FilledButton.icon(
+                        onPressed: value.text.trim().isEmpty
+                            ? null
+                            : () => Navigator.pop(context, true),
+                        icon: const Icon(Icons.send, size: 18),
+                        label: const Text('Senden'),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              bottomActionBarConfig: const BottomActionBarConfig(
-                enabled: false,
+              const Divider(height: 1),
+              Expanded(
+                child: EmojiPicker(
+                  onEmojiSelected: _onEmojiSelected,
+                  config: Config(
+                    height: 360,
+                    emojiViewConfig: EmojiViewConfig(
+                      emojiSizeMax:
+                          28 *
+                          (foundation.defaultTargetPlatform ==
+                                  TargetPlatform.iOS
+                              ? 1.2
+                              : 1.0),
+                    ),
+                    bottomActionBarConfig: const BottomActionBarConfig(
+                      enabled: false,
+                    ),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
-    if (mounted) setState(() => _emojiPickerVisible = false);
+    if (!mounted) return;
+    setState(() => _emojiPickerVisible = false);
+    if (sendAfterSelection == true) await _send();
   }
 
   void _onEmojiSelected(Category? category, Emoji emoji) {
