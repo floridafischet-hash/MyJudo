@@ -59,7 +59,8 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _repository = widget.repository ?? ChatRepository(accessToken: widget.accessToken);
+    _repository =
+        widget.repository ?? ChatRepository(accessToken: widget.accessToken);
     unawaited(_loadChats());
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
@@ -70,7 +71,8 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void didUpdateWidget(covariant ChatPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.repository == null && widget.accessToken != oldWidget.accessToken) {
+    if (widget.repository == null &&
+        widget.accessToken != oldWidget.accessToken) {
       _repository.dispose();
       _repository = ChatRepository(accessToken: widget.accessToken);
       unawaited(_loadChats());
@@ -132,7 +134,9 @@ class _ChatPageState extends State<ChatPage> {
         final replacement = incoming.where((i) => i.id == m.id).firstOrNull;
         return replacement ?? m;
       }).toList();
-      final newMessages = incoming.where((m) => !existingIds.contains(m.id)).toList();
+      final newMessages = incoming
+          .where((m) => !existingIds.contains(m.id))
+          .toList();
       if (newMessages.isNotEmpty || updated != _messages) {
         setState(() => _messages = [...newMessages, ...updated]);
         if (newMessages.isNotEmpty) _scrollToBottom();
@@ -197,7 +201,11 @@ class _ChatPageState extends State<ChatPage> {
       _error = null;
     });
     try {
-      final message = await _repository.send(selected.id, text, replyToId: replyToId);
+      final message = await _repository.send(
+        selected.id,
+        text,
+        replyToId: replyToId,
+      );
       if (!mounted) return;
       _messageController.clear();
       setState(() {
@@ -260,7 +268,9 @@ class _ChatPageState extends State<ChatPage> {
     try {
       await _repository.deleteMessage(selected.id, message.id);
       if (!mounted) return;
-      setState(() => _messages = _messages.where((m) => m.id != message.id).toList());
+      setState(
+        () => _messages = _messages.where((m) => m.id != message.id).toList(),
+      );
     } on ChatApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
     }
@@ -270,10 +280,16 @@ class _ChatPageState extends State<ChatPage> {
     final selected = _selected;
     if (selected == null) return;
     try {
-      final updated = await _repository.editMessage(selected.id, message.id, newText);
+      final updated = await _repository.editMessage(
+        selected.id,
+        message.id,
+        newText,
+      );
       if (!mounted) return;
       setState(() {
-        _messages = _messages.map((m) => m.id == updated.id ? updated : m).toList();
+        _messages = _messages
+            .map((m) => m.id == updated.id ? updated : m)
+            .toList();
       });
     } on ChatApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -321,7 +337,10 @@ class _ChatPageState extends State<ChatPage> {
             if (canDelete)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
-                title: const Text('Löschen', style: TextStyle(color: Colors.red)),
+                title: const Text(
+                  'Löschen',
+                  style: TextStyle(color: Colors.red),
+                ),
                 onTap: () {
                   Navigator.pop(ctx);
                   unawaited(_deleteMessage(message));
@@ -348,7 +367,10 @@ class _ChatPageState extends State<ChatPage> {
           decoration: const InputDecoration(counterText: ''),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Abbrechen')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Abbrechen'),
+          ),
           FilledButton(
             onPressed: () {
               final text = controller.text.trim();
@@ -383,11 +405,36 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  void _toggleEmojiPicker() {
-    setState(() => _emojiPickerVisible = !_emojiPickerVisible);
-    if (_emojiPickerVisible) {
-      FocusScope.of(context).unfocus();
-    }
+  Future<void> _showEmojiPicker() async {
+    if (_emojiPickerVisible) return;
+    FocusScope.of(context).unfocus();
+    setState(() => _emojiPickerVisible = true);
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: 360,
+          child: EmojiPicker(
+            onEmojiSelected: _onEmojiSelected,
+            config: Config(
+              height: 360,
+              emojiViewConfig: EmojiViewConfig(
+                emojiSizeMax:
+                    28 *
+                    (foundation.defaultTargetPlatform == TargetPlatform.iOS
+                        ? 1.2
+                        : 1.0),
+              ),
+              bottomActionBarConfig: const BottomActionBarConfig(
+                enabled: false,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (mounted) setState(() => _emojiPickerVisible = false);
   }
 
   void _onEmojiSelected(Category? category, Emoji emoji) {
@@ -402,7 +449,9 @@ class _ChatPageState extends State<ChatPage> {
     controller.value = TextEditingValue(
       text: newText,
       selection: TextSelection.collapsed(
-        offset: (selection.start < 0 ? text.length : selection.start) + emoji.emoji.length,
+        offset:
+            (selection.start < 0 ? text.length : selection.start) +
+            emoji.emoji.length,
       ),
     );
   }
@@ -464,7 +513,10 @@ class _ChatPageState extends State<ChatPage> {
                       ? Icons.group_outlined
                       : Icons.person_outline,
                 ),
-          title: Text(chat.title, style: Theme.of(context).textTheme.titleLarge),
+          title: Text(
+            chat.title,
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
         ),
         const Divider(height: 1),
         if (_error != null)
@@ -481,7 +533,10 @@ class _ChatPageState extends State<ChatPage> {
               : ListView.builder(
                   controller: _scrollController,
                   reverse: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 16,
+                  ),
                   itemCount: _messages.length + (_nextBefore != null ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == _messages.length) {
@@ -522,7 +577,7 @@ class _ChatPageState extends State<ChatPage> {
             children: [
               // Emoji button
               IconButton(
-                onPressed: _toggleEmojiPicker,
+                onPressed: _showEmojiPicker,
                 icon: Icon(
                   _emojiPickerVisible
                       ? Icons.keyboard_outlined
@@ -550,7 +605,10 @@ class _ChatPageState extends State<ChatPage> {
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.all(Radius.circular(24)),
                     ),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                   ),
                 ),
               ),
@@ -580,21 +638,6 @@ class _ChatPageState extends State<ChatPage> {
             ],
           ),
         ),
-        // Emoji picker
-        if (_emojiPickerVisible)
-          SizedBox(
-            height: 280,
-            child: EmojiPicker(
-              onEmojiSelected: _onEmojiSelected,
-              config: Config(
-                height: 280,
-                emojiViewConfig: EmojiViewConfig(
-                  emojiSizeMax: 28 * (foundation.defaultTargetPlatform == TargetPlatform.iOS ? 1.2 : 1.0),
-                ),
-                bottomActionBarConfig: const BottomActionBarConfig(enabled: false),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -603,7 +646,11 @@ class _ChatPageState extends State<ChatPage> {
 // ─── Swipeable message (swipe right → reply) ─────────────────────────────────
 
 class _SwipeableMessage extends StatefulWidget {
-  const _SwipeableMessage({required this.child, required this.onSwipe, super.key});
+  const _SwipeableMessage({
+    required this.child,
+    required this.onSwipe,
+    super.key,
+  });
   final Widget child;
   final VoidCallback onSwipe;
 
@@ -611,20 +658,9 @@ class _SwipeableMessage extends StatefulWidget {
   State<_SwipeableMessage> createState() => _SwipeableMessageState();
 }
 
-class _SwipeableMessageState extends State<_SwipeableMessage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 200),
-  );
+class _SwipeableMessageState extends State<_SwipeableMessage> {
   double _drag = 0;
   bool _triggered = false;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
 
   void _onHorizontalUpdate(DragUpdateDetails details) {
     if (details.delta.dx < 0) return; // only right swipe
@@ -661,10 +697,7 @@ class _SwipeableMessageState extends State<_SwipeableMessage>
                 ),
               ),
             ),
-          Transform.translate(
-            offset: Offset(_drag, 0),
-            child: widget.child,
-          ),
+          Transform.translate(offset: Offset(_drag, 0), child: widget.child),
         ],
       ),
     );
@@ -759,6 +792,7 @@ class _MessageBubble extends StatelessWidget {
     return Align(
       alignment: own ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
+        onTap: onLongPress,
         onLongPress: onLongPress,
         child: Card(
           color: own ? Theme.of(context).colorScheme.primaryContainer : null,
@@ -776,10 +810,11 @@ class _MessageBubble extends StatelessWidget {
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
                         message.senderName,
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              color: Theme.of(context).colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                     ),
                   if (message.replyToText != null)
@@ -808,9 +843,8 @@ class _MessageBubble extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           'bearbeitet',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontStyle: FontStyle.italic,
-                          ),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(fontStyle: FontStyle.italic),
                         ),
                       ],
                     ],
@@ -846,12 +880,14 @@ class _ChatImageState extends State<_ChatImage> {
   }
 
   Future<Uint8List> _load() async {
-    final dio = Dio(BaseOptions(
-      baseUrl: AppConfig.apiBaseUrl,
-      headers: {'Authorization': 'Bearer ${widget.accessToken}'},
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 30),
-    ));
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: AppConfig.apiBaseUrl,
+        headers: {'Authorization': 'Bearer ${widget.accessToken}'},
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 30),
+      ),
+    );
     try {
       // imageUrl is an absolute path like /api/v1/chats/.../image
       // baseUrl is https://host/api/v1, so we request the path relative to host
@@ -868,9 +904,7 @@ class _ChatImageState extends State<_ChatImage> {
 
   void _openFullscreen(Uint8List bytes) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FullscreenImage(bytes: bytes),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _FullscreenImage(bytes: bytes)),
     );
   }
 
@@ -921,11 +955,7 @@ class _FullscreenImage extends StatelessWidget {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
       ),
-      body: Center(
-        child: InteractiveViewer(
-          child: Image.memory(bytes),
-        ),
-      ),
+      body: Center(child: InteractiveViewer(child: Image.memory(bytes))),
     );
   }
 }

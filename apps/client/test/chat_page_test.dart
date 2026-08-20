@@ -1,3 +1,4 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:myjudo_client/src/chat/chat_models.dart';
@@ -30,6 +31,7 @@ void main() {
     // The latest message appears in the chat preview and the conversation.
     expect(find.text('Willkommen'), findsNWidgets(2));
     await tester.enterText(find.byType(TextField), 'Neue Nachricht');
+    await tester.pump();
     await tester.tap(find.byTooltip('Senden'));
     await tester.pumpAndSettle();
 
@@ -73,15 +75,62 @@ void main() {
     expect(repository.directParticipantId, 'stefan-id');
     expect(find.text('Stefan Test'), findsNWidgets(2));
   });
+
+  testWidgets('opens emoji picker and exposes reply and delete actions', (
+    tester,
+  ) async {
+    final repository = _FakeChatRepository(includeOwnMessage: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SizedBox(
+            width: 1000,
+            height: 700,
+            child: ChatPage(
+              accessToken: 'test-token',
+              currentUserId: 'current-user',
+              repository: repository,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Emoji'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EmojiPicker), findsOneWidget);
+    await tester.tap(find.byType(ModalBarrier).last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Willkommen').last);
+    await tester.pumpAndSettle();
+    expect(find.text('Antworten'), findsOneWidget);
+    await tester.tap(find.text('Antworten'));
+    await tester.pumpAndSettle();
+    expect(find.text('Andere Person'), findsNWidgets(2));
+
+    await tester.tap(find.text('Eigene Nachricht'));
+    await tester.pumpAndSettle();
+    expect(find.text('Löschen'), findsOneWidget);
+    await tester.tap(find.text('Löschen'));
+    await tester.pumpAndSettle();
+    expect(repository.deletedMessageId, 'message-own');
+    expect(find.text('Eigene Nachricht'), findsNothing);
+  });
 }
 
 class _FakeChatRepository extends ChatRepository {
-  _FakeChatRepository() : super(accessToken: 'test-token');
+  _FakeChatRepository({this.includeOwnMessage = false})
+    : super(accessToken: 'test-token');
+
+  final bool includeOwnMessage;
 
   String? sentText;
   int markedRead = 0;
   String? directorySearch;
   String? directParticipantId;
+  String? deletedMessageId;
 
   @override
   Future<List<ChatSummary>> listChats() async => [
@@ -111,6 +160,14 @@ class _FakeChatRepository extends ChatRepository {
   Future<MessagePage> listMessages(String chatId, {String? before}) async =>
       MessagePage(
         items: [
+          if (includeOwnMessage)
+            ChatMessage(
+              id: 'message-own',
+              senderId: 'current-user',
+              senderName: 'Ich',
+              text: 'Eigene Nachricht',
+              createdAt: DateTime.utc(2026, 8, 10, 10, 1),
+            ),
           ChatMessage(
             id: 'message-1',
             senderId: 'other-user',
@@ -121,6 +178,11 @@ class _FakeChatRepository extends ChatRepository {
         ],
         nextBefore: null,
       );
+
+  @override
+  Future<void> deleteMessage(String chatId, String messageId) async {
+    deletedMessageId = messageId;
+  }
 
   @override
   Future<void> markRead(String chatId) async {
