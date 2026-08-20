@@ -63,6 +63,20 @@ class AuthRepository {
     }
   }
 
+  Future<AuthSession> refresh(String refreshToken) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/auth/refresh',
+        data: {'refreshToken': refreshToken},
+      );
+      final session = AuthSession.fromJson(_requiredBody(response));
+      await _persistRefresh(session.refreshToken);
+      return session;
+    } on DioException catch (error) {
+      throw AuthException(_messageFor(error));
+    }
+  }
+
   Future<void> logout(String refreshToken) async {
     try {
       await _dio.post<void>(

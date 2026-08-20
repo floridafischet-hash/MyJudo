@@ -215,6 +215,7 @@ export class ChatService {
     chatId: string,
     file: Express.Multer.File,
     rawText: string | undefined,
+    rawReplyToId: string | undefined,
   ): Promise<MessageSummary> {
     const chat = await this.assertAccess(actor, chatId);
     if (!file?.buffer?.length) throw new BadRequestException('Bilddatei fehlt.');
@@ -238,6 +239,15 @@ export class ChatService {
       throw new BadRequestException('Dateiendung und Bildinhalt stimmen nicht überein.');
     const text = (rawText ?? '').trim();
     if (text.length > 4000) throw new BadRequestException('Die Nachricht ist zu lang.');
+    let replyToId: string | null = null;
+    let replyToText: string | null = null;
+    if (rawReplyToId) {
+      const replied = await this.messages.findOneBy({ id: rawReplyToId, chatId });
+      if (replied) {
+        replyToId = replied.id;
+        replyToText = replied.text.slice(0, 200) || '📷 Bild';
+      }
+    }
     const stored = `${randomUUID()}.${extension}`;
     const root = this.config.get<string>('CHAT_IMAGE_STORAGE_PATH') ?? '/app/data/chat-images';
     await mkdir(root, { recursive: true });
@@ -248,6 +258,8 @@ export class ChatService {
         chatId: chat.id,
         senderId: actor.id,
         text,
+        replyToId,
+        replyToText,
         imageStoredName: stored,
         imageMimeType: mime,
         imageOriginalName: file.originalname.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 255),

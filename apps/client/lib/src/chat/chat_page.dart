@@ -40,8 +40,7 @@ class ChatPage extends StatefulWidget {
 }
 
 class _ChatPageState extends State<ChatPage> {
-  late final ChatRepository _repository =
-      widget.repository ?? ChatRepository(accessToken: widget.accessToken);
+  late ChatRepository _repository;
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   Timer? _refreshTimer;
@@ -60,11 +59,22 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
+    _repository = widget.repository ?? ChatRepository(accessToken: widget.accessToken);
     unawaited(_loadChats());
     _refreshTimer = Timer.periodic(
       const Duration(seconds: 15),
       (_) => unawaited(_pollUpdates()),
     );
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.repository == null && widget.accessToken != oldWidget.accessToken) {
+      _repository.dispose();
+      _repository = ChatRepository(accessToken: widget.accessToken);
+      unawaited(_loadChats());
+    }
   }
 
   @override

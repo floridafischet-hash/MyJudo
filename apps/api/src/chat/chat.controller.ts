@@ -81,8 +81,9 @@ export class ChatController {
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @UploadedFile() file: Express.Multer.File,
     @Body('text') text: string,
+    @Body('replyToId') replyToId: string | undefined,
   ) {
-    return this.chats.sendImage(request.user, id, file, text);
+    return this.chats.sendImage(request.user, id, file, text, replyToId);
   }
 
   @Get(':id/messages/:messageId/image')

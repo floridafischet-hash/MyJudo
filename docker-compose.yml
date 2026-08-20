@@ -27,16 +27,32 @@ services:
       JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
       PASSWORD_PEPPER: ${PASSWORD_PEPPER:?PASSWORD_PEPPER is required}
       INITIAL_ORGANIZATION_SLUG: ${INITIAL_ORGANIZATION_SLUG:-myjudo}
+      INITIAL_ORGANIZATION_NAME: ${INITIAL_ORGANIZATION_NAME:-MyJudo}
     depends_on:
       postgres:
         condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
     ports:
       - "127.0.0.1:${API_HOST_PORT:-18779}:3000"
     restart: unless-stopped
+    volumes:
+      - download_data:/app/data/downloads
+      - chat_image_data:/app/data/chat-images
     networks: [frontend, backend]
+
+  storage-init:
+    image: alpine:3.22
+    command: ["sh", "-c", "chown -R 1000:1000 /data/downloads /data/chat-images"]
+    restart: "no"
+    volumes:
+      - download_data:/data/downloads
+      - chat_image_data:/data/chat-images
 
 volumes:
   postgres_data:
+  download_data:
+  chat_image_data:
 
 networks:
   frontend:
