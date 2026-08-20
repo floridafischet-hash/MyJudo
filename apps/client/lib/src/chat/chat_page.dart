@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../config/app_config.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
 import 'direct_chat_dialog.dart';
@@ -834,14 +836,24 @@ class _ChatImageState extends State<_ChatImage> {
   }
 
   Future<Uint8List> _load() async {
-    final dio = ChatRepository(accessToken: widget.accessToken);
-    // Use the raw URL from the imageUrl field — it already contains the path.
-    // We call it via the repository's internal Dio instead of exposing raw bytes.
-    // Simpler: use the http package via dio directly.
-    final client = dio;
-    final bytes = await client.fetchImageBytes(widget.url);
-    dio.dispose();
-    return bytes;
+    final dio = Dio(BaseOptions(
+      baseUrl: AppConfig.apiBaseUrl,
+      headers: {'Authorization': 'Bearer ${widget.accessToken}'},
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 30),
+    ));
+    try {
+      // imageUrl is an absolute path like /api/v1/chats/.../image
+      // baseUrl is https://host/api/v1, so we request the path relative to host
+      final fullUrl = '${Uri.parse(AppConfig.apiBaseUrl).origin}${widget.url}';
+      final response = await dio.get<List<int>>(
+        fullUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      return Uint8List.fromList(response.data ?? const []);
+    } finally {
+      dio.close();
+    }
   }
 
   void _openFullscreen(Uint8List bytes) {

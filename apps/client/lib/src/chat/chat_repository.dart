@@ -101,11 +101,12 @@ class ChatRepository {
     String? replyToId,
   }) async {
     try {
-      final formData = FormData.fromMap({
+      final fields = <String, dynamic>{
         'image': MultipartFile.fromBytes(bytes, filename: filename),
-        'text': (text != null && text.isNotEmpty) ? text : null,
-        'replyToId': replyToId,
-      });
+      };
+      if (text != null && text.isNotEmpty) fields['text'] = text;
+      if (replyToId != null) fields['replyToId'] = replyToId;
+      final formData = FormData.fromMap(fields);
       final response = await _dio.post<Map<String, dynamic>>(
         '/chats/$chatId/images',
         data: formData,
