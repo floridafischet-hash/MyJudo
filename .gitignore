@@ -1,0 +1,26 @@
+node_modules/
+dist/
+coverage/
+.dart_tool/
+.flutter-plugins*
+.packages
+build/
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.crt
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+backups/
+
+# Stray backup/incident artifacts found in this workspace, not real source
+*.bak
+*.bak.*
+*.unreadable-backup

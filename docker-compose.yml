@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: myjudo
+      POSTGRES_USER: myjudo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-development-only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U myjudo -d myjudo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [backend]
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://myjudo:${POSTGRES_PASSWORD:-development-only}@postgres:5432/myjudo
+      APP_ORIGIN: ${APP_ORIGIN:?APP_ORIGIN is required}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET is required}
+      JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+      PASSWORD_PEPPER: ${PASSWORD_PEPPER:?PASSWORD_PEPPER is required}
+      INITIAL_ORGANIZATION_SLUG: ${INITIAL_ORGANIZATION_SLUG:-myjudo}
+      INITIAL_ORGANIZATION_NAME: ${INITIAL_ORGANIZATION_NAME:-MyJudo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      storage-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:-18779}:3000"
+    restart: unless-stopped
+    volumes:
+      - download_data:/app/data/downloads
+      - chat_image_data:/app/data/chat-images
+      - avatar_data:/app/data/avatars
+    networks: [frontend, backend]
+
+  storage-init:
+    image: alpine:3.22
+    command: ["sh", "-c", "chown -R 1000:1000 /data/downloads /data/chat-images /data/avatars"]
+    restart: "no"
+    volumes:
+      - download_data:/data/downloads
+      - chat_image_data:/data/chat-images
+      - avatar_data:/data/avatars
+
+volumes:
+  postgres_data:
+  download_data:
+  chat_image_data:
+  avatar_data:
+
+networks:
+  frontend:
+  backend:
+    internal: true

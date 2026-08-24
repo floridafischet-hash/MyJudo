@@ -1,0 +1,53 @@
+name: Backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: myjudo
+          POSTGRES_USER: myjudo
+          POSTGRES_PASSWORD: test-password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U myjudo -d myjudo"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://myjudo:test-password@127.0.0.1:5432/myjudo
+      APP_ORIGIN: https://localhost:18780
+      KEYCLOAK_URL: http://127.0.0.1:9999
+      KEYCLOAK_JWKS_URL: http://127.0.0.1:9999
+      KEYCLOAK_REALM: myjudo
+      KEYCLOAK_CLIENT_ID: myjudo-client
+      KEYCLOAK_AUDIENCE: myjudo-api
+      INITIAL_ORGANIZATION_SLUG: test-verein
+      INITIAL_ORGANIZATION_NAME: Test Verein
+      INITIAL_ADMIN_EMAIL: admin@example.test
+      INITIAL_ADMIN_KEYCLOAK_SUBJECT: 00000000-0000-0000-0000-000000000001
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run migration:run --workspace @myjudo/api
+      - run: npm run seed --workspace @myjudo/api
+      - run: npm run test:e2e --workspace @myjudo/api
+      - run: npm run build
+      - run: docker build -f apps/api/Dockerfile .

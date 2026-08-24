@@ -1,0 +1,2 @@
+Datum,Uhrzeit,Aufgabe,Provider,Modell,Input-Tokens,Output-Tokens,Gesamt-Tokens,Input-Kosten,Output-Kosten,Gesamtkosten,Währung,Messquelle
+2026-08-10,14:50,Keycloak-Integration und Benutzerkorrektur,OpenAI,openai/gpt-5.6-sol,382,63,445,nicht verfügbar,nicht verfügbar,nicht verfügbar,nicht verfügbar,OpenClaw session_status

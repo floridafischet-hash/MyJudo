@@ -1,0 +1,1 @@
+void setMyJudoBrowserTitle(int unreadCount) {}
