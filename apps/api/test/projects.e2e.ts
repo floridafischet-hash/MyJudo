@@ -182,4 +182,46 @@ describe('Project completion and reopening', () => {
       status: 'active',
     });
   });
+
+  it('validates project images and protects upload and direct image URLs', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ title: `Projektbilder ${suffix}`, status: 'active', members: [] })
+      .expect(201);
+    const projectId = created.body.id as string;
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projectId}/images`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .attach('image', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), 'bild.jpg')
+      .expect(403);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projectId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('image', Buffer.from('kein bild'), 'bild.jpg')
+      .expect(400);
+
+    const uploaded = await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projectId}/images`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .field('title', 'Mannschaftsfoto')
+      .attach('image', Buffer.from([0xff, 0xd8, 0xff, 0xd9]), 'bild.jpg')
+      .expect(201);
+    const cardId = uploaded.body.id as string;
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/projects/${projectId}/images/${cardId}`)
+      .set('Authorization', `Bearer ${outsiderToken}`)
+      .expect(403);
+
+    const image = await request(app.getHttpServer())
+      .get(`/api/v1/projects/${projectId}/images/${cardId}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200)
+      .expect('X-Content-Type-Options', 'nosniff')
+      .expect('Content-Type', /image\/jpeg/);
+    expect(image.body).toEqual(Buffer.from([0xff, 0xd8, 0xff, 0xd9]));
+  });
 });

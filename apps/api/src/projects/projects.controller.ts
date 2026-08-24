@@ -11,8 +11,13 @@ import {
   Put,
   Query,
   Req,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PermissionGuard } from '../rbac/permission.guard';
@@ -62,6 +67,30 @@ export class ProjectsController {
     @Body() dto: CreateCardDto,
   ) {
     return this.projects.addCard(r.user, id, dto);
+  }
+  @Post(':id/images')
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  addImage(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Body('title') title?: string,
+  ) {
+    return this.projects.addImage(r.user, id, file, title);
+  }
+  @Get(':id/images/:cardId')
+  async image(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('cardId', new ParseUUIDPipe({ version: '4' })) cardId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const image = await this.projects.image(r.user, id, cardId);
+    response.setHeader('Content-Type', image.mime);
+    response.setHeader('Content-Disposition', 'inline');
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.setHeader('Cache-Control', 'private, max-age=300');
+    response.send(image.buffer);
   }
   @Put(':id/cards/:cardId') updateCard(
     @Req() r: R,

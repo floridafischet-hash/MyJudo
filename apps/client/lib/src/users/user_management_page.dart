@@ -64,7 +64,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
   List<Map<String, dynamic>> _maps(List<dynamic>? value) =>
       (value ?? []).map((e) => Map<String, dynamic>.from(e as Map)).toList();
-  Future<void> _uploadAvatar(String id, Uint8List bytes, String filename) async {
+  Future<void> _uploadAvatar(
+    String id,
+    Uint8List bytes,
+    String filename,
+  ) async {
     final data = FormData.fromMap({
       'avatar': MultipartFile.fromBytes(bytes, filename: filename),
     });
@@ -208,7 +212,8 @@ class _UserDialog extends StatefulWidget {
   final Map<String, dynamic>? user;
   final List<Map<String, dynamic>> groups, roles;
   final String accessToken;
-  final Future<void> Function(String id, Uint8List bytes, String filename) onUploadAvatar;
+  final Future<void> Function(String id, Uint8List bytes, String filename)
+  onUploadAvatar;
   final Future<void> Function(String id) onDeleteAvatar;
   @override
   State<_UserDialog> createState() => _UserDialogState();
@@ -297,9 +302,16 @@ class _UserDialogState extends State<_UserDialog> {
               url: _avatarUrl,
               accessToken: widget.accessToken,
               radius: 28,
-              fallback: CircleAvatar(radius: 28, backgroundColor: parseHexColor(color)),
+              fallback: CircleAvatar(
+                radius: 28,
+                backgroundColor: parseHexColor(color),
+              ),
               onUpload: (bytes, filename) async {
-                await widget.onUploadAvatar(widget.user!['id'].toString(), bytes, filename);
+                await widget.onUploadAvatar(
+                  widget.user!['id'].toString(),
+                  bytes,
+                  filename,
+                );
                 if (mounted) setState(() => hasAvatar = true);
               },
               onDelete: () async {

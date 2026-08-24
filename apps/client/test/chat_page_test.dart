@@ -102,7 +102,7 @@ void main() {
 
     await repository.listMessages('chat-live');
 
-    expect(request?.queryParameters, {'limit': 100});
+    expect(request?.queryParameters, {'limit': 50});
   });
 
   test('full conversation is ordered oldest first and newest last', () async {
@@ -174,7 +174,7 @@ void main() {
 
       final result = await repository.sendImage(
         'chat-1',
-        <int>[0xff, 0xd8, 0xff, 0xd9],
+        Uint8List.fromList(<int>[0xff, 0xd8, 0xff, 0xd9]),
         'turnier.jpg',
         text: 'Turnier 🥋',
       );
@@ -216,8 +216,10 @@ void main() {
     expect(find.text('Willkommen'), findsNWidgets(2));
     await tester.tap(find.byKey(const Key('emoji-button')));
     await tester.pumpAndSettle();
-    expect(find.text('Smileys'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('emoji-🥋')).first);
+    expect(find.text('Emoji auswählen'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-emoji-😀')).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fertig'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField), 'Neue Nachricht');
     await tester.tap(find.byTooltip('Senden'));
@@ -255,7 +257,8 @@ void main() {
     final scrollable = tester.state<ScrollableState>(
       find.descendant(of: list, matching: find.byType(Scrollable)).first,
     );
-    expect(scrollable.position.pixels, scrollable.position.maxScrollExtent);
+    expect(scrollable.position.maxScrollExtent, greaterThan(0));
+    expect(scrollable.position.pixels, 0);
     expect(find.text('Nachricht 39'), findsOneWidget);
   });
 
@@ -470,7 +473,11 @@ class _FakeChatRepository extends ChatRepository {
   }
 
   @override
-  Future<ChatMessage> send(String chatId, String text) async {
+  Future<ChatMessage> send(
+    String chatId,
+    String text, {
+    String? replyToId,
+  }) async {
     sentText = text;
     sent += 1;
     return ChatMessage(
@@ -501,7 +508,7 @@ class _ManyMessagesChatRepository extends _FakeChatRepository {
             text: 'Nachricht $index',
             createdAt: DateTime.utc(2026, 8, 10, 10, index),
           ),
-        ),
+        ).reversed.toList(),
         nextBefore: null,
       );
 }

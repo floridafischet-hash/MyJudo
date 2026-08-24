@@ -297,7 +297,10 @@ class _ChatDialogState extends State<_ChatDialog> {
                 onUpload: (bytes, filename) async {
                   await widget.onUploadAvatar(bytes, filename);
                   if (mounted) {
-                    setState(() => avatarUrl = '/api/v1/chats/${widget.chat!.id}/avatar');
+                    setState(
+                      () =>
+                          avatarUrl = '/api/v1/chats/${widget.chat!.id}/avatar',
+                    );
                   }
                 },
                 onDelete: () async {

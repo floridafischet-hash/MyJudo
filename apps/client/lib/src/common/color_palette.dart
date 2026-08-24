@@ -49,7 +49,12 @@ class ColorSwatchPicker extends StatelessWidget {
       spacing: 10,
       runSpacing: 10,
       children: [
-        for (final hex in colors) _Swatch(hex: hex, selected: hex.toUpperCase() == value.toUpperCase(), onTap: () => onChanged(hex)),
+        for (final hex in colors)
+          _Swatch(
+            hex: hex,
+            selected: hex.toUpperCase() == value.toUpperCase(),
+            onTap: () => onChanged(hex),
+          ),
         InkWell(
           onTap: () async {
             final picked = await showFreeColorPicker(context, value);
@@ -78,7 +83,11 @@ class ColorSwatchPicker extends StatelessWidget {
 }
 
 class _Swatch extends StatelessWidget {
-  const _Swatch({required this.hex, required this.selected, required this.onTap});
+  const _Swatch({
+    required this.hex,
+    required this.selected,
+    required this.onTap,
+  });
   final String hex;
   final bool selected;
   final VoidCallback onTap;
@@ -97,7 +106,9 @@ class _Swatch extends StatelessWidget {
           width: selected ? 3 : 1,
         ),
       ),
-      child: selected ? const Icon(Icons.check, color: Colors.white, size: 18) : null,
+      child: selected
+          ? const Icon(Icons.check, color: Colors.white, size: 18)
+          : null,
     ),
   );
 }

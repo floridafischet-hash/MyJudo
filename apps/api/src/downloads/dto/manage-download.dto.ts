@@ -11,11 +11,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { DownloadCategory } from '../download.entity';
-const array = (v: unknown) => {
+const array = (v: unknown): unknown[] => {
   if (Array.isArray(v)) return v;
   if (typeof v === 'string') {
     try {
-      return JSON.parse(v) as unknown;
+      const parsed: unknown = JSON.parse(v);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }

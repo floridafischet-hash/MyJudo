@@ -30,9 +30,9 @@ export class DownloadsService {
   ) {
     this.root = config.get<string>('DOWNLOAD_STORAGE_PATH') ?? '/app/data/downloads';
   }
-  list(actor: AuthenticatedUser, admin = false) {
+  async list(actor: AuthenticatedUser, admin = false): Promise<Download[]> {
     const parameters = admin ? [actor.organizationId] : [actor.organizationId, actor.id];
-    return this.db.query(
+    return await this.db.query(
       `SELECT d.*${admin ? `,COALESCE((SELECT jsonb_agg(x."groupId") FROM download_groups x WHERE x."downloadId"=d.id),'[]') AS "groupIds",COALESCE((SELECT jsonb_agg(x."roleId") FROM download_roles x WHERE x."downloadId"=d.id),'[]') AS "roleIds",COALESCE((SELECT jsonb_agg(x."userId") FROM download_users x WHERE x."downloadId"=d.id),'[]') AS "userIds"` : ''} FROM downloads d WHERE d."organizationId"=$1 AND d."deletedAt" IS NULL ${admin ? '' : `AND d.active=true AND (d."availableToAll"=true OR EXISTS(SELECT 1 FROM download_users x WHERE x."downloadId"=d.id AND x."userId"=$2) OR EXISTS(SELECT 1 FROM download_groups x JOIN user_groups ug ON ug."groupId"=x."groupId" WHERE x."downloadId"=d.id AND ug."userId"=$2) OR EXISTS(SELECT 1 FROM download_roles x JOIN user_roles ur ON ur."roleId"=x."roleId" WHERE x."downloadId"=d.id AND ur."userId"=$2))`} ORDER BY d.category,d.title`,
       parameters,
     );
@@ -86,7 +86,7 @@ export class DownloadsService {
           ids.length &&
           (await m
             .getRepository(entity)
-            .countBy({ id: In(ids), organizationId: actor.organizationId } as never)) !== ids.length
+            .countBy({ id: In(ids), organizationId: actor.organizationId })) !== ids.length
         )
           throw new NotFoundException('Freigabeziel wurde nicht gefunden.');
       }
@@ -120,15 +120,15 @@ export class DownloadsService {
       if (dto.groupIds.length)
         await m
           .getRepository(DownloadGroup)
-          .insert(dto.groupIds.map((groupId) => ({ downloadId: d!.id, groupId })));
+          .insert(dto.groupIds.map((groupId) => ({ downloadId: d.id, groupId })));
       if (dto.roleIds.length)
         await m
           .getRepository(DownloadRole)
-          .insert(dto.roleIds.map((roleId) => ({ downloadId: d!.id, roleId })));
+          .insert(dto.roleIds.map((roleId) => ({ downloadId: d.id, roleId })));
       if (dto.userIds.length)
         await m
           .getRepository(DownloadUser)
-          .insert(dto.userIds.map((userId) => ({ downloadId: d!.id, userId })));
+          .insert(dto.userIds.map((userId) => ({ downloadId: d.id, userId })));
       if (file && old) await unlink(join(this.root, old)).catch(() => {});
       await m.getRepository(AuditLog).save({
         organizationId: actor.organizationId,
@@ -144,7 +144,7 @@ export class DownloadsService {
   }
   async file(actor: AuthenticatedUser, id: string) {
     const visible = await this.list(actor);
-    const d = visible.find((x: { id: string }) => x.id === id) as Download | undefined;
+    const d = visible.find((candidate) => candidate.id === id);
     if (!d) throw new ForbiddenException('Kein Zugriff auf diese Datei.');
     return { download: d, buffer: await readFile(join(this.root, d.storedName)) };
   }

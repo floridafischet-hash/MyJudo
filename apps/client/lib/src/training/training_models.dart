@@ -16,7 +16,8 @@ class TrainingGroup {
   final int? minimumAge, maximumAge;
   final String? color;
   final bool hasAvatar;
-  String? get avatarUrl => hasAvatar ? '/api/v1/training/groups/$id/avatar' : null;
+  String? get avatarUrl =>
+      hasAvatar ? '/api/v1/training/groups/$id/avatar' : null;
   factory TrainingGroup.fromJson(Map<String, dynamic> json) => TrainingGroup(
     id: json['id'] as String,
     name: json['name'] as String,

@@ -109,9 +109,7 @@ describe('ChatService message deletion', () => {
       .fn()
       .mockResolvedValue({ id: 'chat-1', type: ChatType.Direct });
     permissions.hasRole.mockResolvedValue(false);
-    await expect(service.deleteChat(actor, 'chat-1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.deleteChat(actor, 'chat-1')).rejects.toBeInstanceOf(ForbiddenException);
     expect(chatRepository.softRemove).not.toHaveBeenCalled();
   });
 
@@ -120,9 +118,7 @@ describe('ChatService message deletion', () => {
       .fn()
       .mockResolvedValue({ id: 'chat-1', type: ChatType.Group });
     permissions.hasRole.mockResolvedValue(true);
-    await expect(service.deleteChat(actor, 'chat-1')).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
+    await expect(service.deleteChat(actor, 'chat-1')).rejects.toBeInstanceOf(ForbiddenException);
     expect(chatRepository.softRemove).not.toHaveBeenCalled();
   });
 });

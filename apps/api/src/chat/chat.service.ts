@@ -105,8 +105,8 @@ export class ChatService {
     const summaries = await Promise.all(visible.map((chat) => this.toSummary(actor, chat)));
     return summaries.sort(
       (a, b) =>
-        (b.lastMessage?.createdAt.getTime() ?? 0) -
-          (a.lastMessage?.createdAt.getTime() ?? 0) || a.title.localeCompare(b.title),
+        (b.lastMessage?.createdAt.getTime() ?? 0) - (a.lastMessage?.createdAt.getTime() ?? 0) ||
+        a.title.localeCompare(b.title),
     );
   }
 
@@ -279,9 +279,7 @@ export class ChatService {
       throw error;
     }
     await this.touchParticipant(this.dataSource.manager, chat.id, actor.id, message.createdAt);
-    message.sender = await this.dataSource
-      .getRepository(User)
-      .findOneByOrFail({ id: actor.id });
+    message.sender = await this.dataSource.getRepository(User).findOneByOrFail({ id: actor.id });
     return toMessageSummary(message);
   }
 
@@ -360,9 +358,7 @@ export class ChatService {
       throw error;
     }
     await this.touchParticipant(this.dataSource.manager, chat.id, actor.id, message.createdAt);
-    message.sender = await this.dataSource
-      .getRepository(User)
-      .findOneByOrFail({ id: actor.id });
+    message.sender = await this.dataSource.getRepository(User).findOneByOrFail({ id: actor.id });
     return toMessageSummary(message);
   }
 
@@ -415,17 +411,14 @@ export class ChatService {
     const visibleMessage = messageId
       ? await this.messages.findOneBy({ id: messageId, chatId: chat.id })
       : null;
-    if (messageId && !visibleMessage) throw new NotFoundException('Nachricht wurde nicht gefunden.');
+    if (messageId && !visibleMessage)
+      throw new NotFoundException('Nachricht wurde nicht gefunden.');
     const readAt = visibleMessage?.createdAt ?? new Date();
     await this.touchParticipant(this.dataSource.manager, chat.id, actor.id, readAt);
     return { readAt };
   }
 
-  async deleteMessage(
-    actor: AuthenticatedUser,
-    chatId: string,
-    messageId: string,
-  ): Promise<void> {
+  async deleteMessage(actor: AuthenticatedUser, chatId: string, messageId: string): Promise<void> {
     await this.assertAccess(actor, chatId);
     const message = await this.messages.findOneBy({ id: messageId, chatId });
     if (!message) throw new NotFoundException('Nachricht wurde nicht gefunden.');
@@ -463,32 +456,24 @@ export class ChatService {
       });
     });
     if (storedName) {
-      const root =
-        this.config.get<string>('CHAT_IMAGE_STORAGE_PATH') ?? '/app/data/chat-images';
+      const root = this.config.get<string>('CHAT_IMAGE_STORAGE_PATH') ?? '/app/data/chat-images';
       await unlink(join(root, storedName)).catch(() => undefined);
     }
     if (storedAudioName) {
       const audioRoot =
-        this.config.get<string>('CHAT_AUDIO_STORAGE_PATH') ??
-        '/app/data/chat-images/voice';
+        this.config.get<string>('CHAT_AUDIO_STORAGE_PATH') ?? '/app/data/chat-images/voice';
       await unlink(join(audioRoot, storedAudioName)).catch(() => undefined);
     }
   }
 
   async deleteChat(actor: AuthenticatedUser, chatId: string): Promise<void> {
     const chat = await this.assertAccess(actor, chatId);
-    const superuser = await this.permissions.hasRole(
-      actor.id,
-      actor.organizationId,
-      'Superuser',
-    );
+    const superuser = await this.permissions.hasRole(actor.id, actor.organizationId, 'Superuser');
     if (!superuser) {
       throw new ForbiddenException('Nur Superuser dürfen Chats löschen.');
     }
     if (chat.type === ChatType.Group) {
-      throw new ForbiddenException(
-        'Gruppenchats werden über die Chatverwaltung gelöscht.',
-      );
+      throw new ForbiddenException('Gruppenchats werden über die Chatverwaltung gelöscht.');
     }
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(Chat).softRemove(chat);
@@ -504,7 +489,9 @@ export class ChatService {
     });
   }
 
-  async unread(actor: AuthenticatedUser): Promise<{ total: number; chats: { chatId: string; count: number }[] }> {
+  async unread(
+    actor: AuthenticatedUser,
+  ): Promise<{ total: number; chats: { chatId: string; count: number }[] }> {
     const summaries = await this.list(actor);
     const chats = summaries
       .filter((chat) => chat.unreadCount > 0)
@@ -512,7 +499,9 @@ export class ChatService {
     return { total: chats.reduce((sum, chat) => sum + chat.count, 0), chats };
   }
 
-  async listAdmin(actor: AuthenticatedUser): Promise<(ChatSummary & { archived: boolean; active: boolean; groupIds: string[] })[]> {
+  async listAdmin(
+    actor: AuthenticatedUser,
+  ): Promise<(ChatSummary & { archived: boolean; active: boolean; groupIds: string[] })[]> {
     const chats = await this.chats.find({
       where: { organizationId: actor.organizationId, type: ChatType.Group },
       order: { title: 'ASC' },
@@ -522,9 +511,9 @@ export class ChatService {
         ...(await this.toSummary(actor, chat)),
         archived: chat.archived,
         active: chat.active,
-        groupIds: (
-          await this.dataSource.getRepository(ChatGroup).findBy({ chatId: chat.id })
-        ).map((entry) => entry.groupId),
+        groupIds: (await this.dataSource.getRepository(ChatGroup).findBy({ chatId: chat.id })).map(
+          (entry) => entry.groupId,
+        ),
       })),
     );
   }
@@ -597,7 +586,10 @@ export class ChatService {
     await deleteImage(this.avatarRoot(), previous);
   }
 
-  async chatAvatar(actor: AuthenticatedUser, id: string): Promise<{ mime: string; buffer: Buffer }> {
+  async chatAvatar(
+    actor: AuthenticatedUser,
+    id: string,
+  ): Promise<{ mime: string; buffer: Buffer }> {
     const chat = await this.assertAccess(actor, id);
     if (!chat.avatarStoredName || !chat.avatarMimeType)
       throw new NotFoundException('Bild wurde nicht gefunden.');
@@ -713,7 +705,9 @@ export class ChatService {
       title:
         chat.type === ChatType.Group
           ? (chat.title ?? 'Gruppe')
-          : (otherUser ? displayName(otherUser) : 'Direktnachricht'),
+          : otherUser
+            ? displayName(otherUser)
+            : 'Direktnachricht',
       description: chat.description,
       icon: chat.icon ?? (chat.type === ChatType.Group ? 'group' : 'person'),
       avatarUrl:

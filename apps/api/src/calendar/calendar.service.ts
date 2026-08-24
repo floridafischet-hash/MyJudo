@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { AuditLog } from '../audit/audit-log.entity';
 import { AuthenticatedUser } from '../auth/auth.types';
@@ -22,13 +22,13 @@ export class CalendarService {
     private readonly permissions: PermissionService,
   ) {}
 
-  async list(actor: AuthenticatedUser, from: string, until: string) {
+  async list(actor: AuthenticatedUser, from: string, until: string): Promise<CalendarEvent[]> {
     const start = new Date(from),
       end = new Date(until);
     if (!Number.isFinite(start.valueOf()) || !Number.isFinite(end.valueOf()) || end <= start)
       throw new BadRequestException('Ungültiger Zeitraum.');
     const superuser = await this.permissions.hasRole(actor.id, actor.organizationId, 'Superuser');
-    return this.data.query(
+    return await this.data.query(
       `SELECT e.*,
         COALESCE(
           (SELECT g.color FROM groups g WHERE g.id = e."groupIds"[1]),
@@ -41,8 +41,8 @@ export class CalendarService {
     );
   }
 
-  async recentActivity(actor: AuthenticatedUser) {
-    return this.data.query(
+  async recentActivity(actor: AuthenticatedUser): Promise<unknown[]> {
+    return await this.data.query(
       `SELECT a.id,a.action,a."entityType",a."entityId",a.metadata,a."createdAt",
         COALESCE(NULLIF(trim(concat(u."firstName",' ',u."lastName")),''),'System') AS "actorName"
        FROM audit_logs a LEFT JOIN users u ON u.id=a."actorUserId"
@@ -180,9 +180,9 @@ export class CalendarService {
 
   private async visible(actor: AuthenticatedUser, id: string) {
     const rows = await this.list(actor, '1970-01-01T00:00:00Z', '2200-01-01T00:00:00Z');
-    const event = rows.find((x: any) => x.id === id);
+    const event = rows.find((candidate) => candidate.id === id);
     if (!event) throw new NotFoundException('Termin wurde nicht gefunden.');
-    return event as CalendarEvent;
+    return event;
   }
   private async manageable(actor: AuthenticatedUser, id: string) {
     const event = await this.events.findOneBy({ id, organizationId: actor.organizationId });
@@ -238,7 +238,8 @@ export class CalendarService {
       ['users', dto.participantIds ?? []],
     ] as const) {
       if (!ids.length) continue;
-      const rows = await this.data.query(
+      const rows = await queryRows<{ id: string }>(
+        this.data,
         `SELECT id FROM ${table} WHERE "organizationId"=$1 AND "deletedAt" IS NULL AND id=ANY($2::uuid[])`,
         [actor.organizationId, ids],
       );
@@ -262,7 +263,13 @@ export class CalendarService {
     if (!meetingHostMatchesProvider(dto.meetingUrl!, dto.meetingProvider!))
       throw new BadRequestException('Der Meeting-Link passt nicht zum ausgewählten Anbieter.');
   }
-  private audit(manager: any, actor: AuthenticatedUser, action: string, id: string, metadata: any) {
+  private audit(
+    manager: EntityManager,
+    actor: AuthenticatedUser,
+    action: string,
+    id: string,
+    metadata: Record<string, unknown>,
+  ) {
     return manager.getRepository(AuditLog).save({
       organizationId: actor.organizationId,
       actorUserId: actor.id,
@@ -273,4 +280,13 @@ export class CalendarService {
       metadata,
     });
   }
+}
+
+async function queryRows<T>(
+  manager: Pick<DataSource, 'query'>,
+  sql: string,
+  parameters: unknown[],
+): Promise<T[]> {
+  const result: unknown = await manager.query(sql, parameters);
+  return Array.isArray(result) ? (result as T[]) : [];
 }

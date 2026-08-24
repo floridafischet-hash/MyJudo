@@ -70,7 +70,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
           .toList();
       if (mounted) setState(() => _items = values);
     } on Object {
-      if (mounted) setState(() => _error = 'Die Systemlogs konnten nicht geladen werden.');
+      if (mounted) {
+        setState(() => _error = 'Die Systemlogs konnten nicht geladen werden.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -121,19 +123,27 @@ class _AuditLogPageState extends State<AuditLogPage> {
                     onSubmitted: (_) => _load(),
                     decoration: InputDecoration(
                       labelText: 'Logs durchsuchen',
-                      suffixIcon: IconButton(onPressed: _load, icon: const Icon(Icons.search)),
+                      suffixIcon: IconButton(
+                        onPressed: _load,
+                        icon: const Icon(Icons.search),
+                      ),
                     ),
                   ),
                 ),
-                _filter('Bereich', _area, areas, (value) { setState(() => _area = value); _load(); }),
-                _filter('Aktion', _action, actions, (value) { setState(() => _action = value); _load(); }),
-                _filter(
-                  'Benutzer',
-                  _actorUserId,
-                  actors.keys.toList(),
-                  (value) { setState(() => _actorUserId = value); _load(); },
-                  labels: actors,
-                ),
+                _filter('Bereich', _area, areas, (value) {
+                  setState(() => _area = value);
+                  _load();
+                }),
+                _filter('Aktion', _action, actions, (value) {
+                  setState(() => _action = value);
+                  _load();
+                }),
+                _filter('Benutzer', _actorUserId, actors.keys.toList(), (
+                  value,
+                ) {
+                  setState(() => _actorUserId = value);
+                  _load();
+                }, labels: actors),
                 OutlinedButton.icon(
                   onPressed: () => _date(true),
                   icon: const Icon(Icons.date_range),
@@ -144,10 +154,22 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   icon: const Icon(Icons.event),
                   label: Text(_until == null ? 'Bis' : _dateText(_until!)),
                 ),
-                if (_area != null || _action != null || _actorUserId != null || _from != null || _until != null || _search.text.isNotEmpty)
+                if (_area != null ||
+                    _action != null ||
+                    _actorUserId != null ||
+                    _from != null ||
+                    _until != null ||
+                    _search.text.isNotEmpty)
                   TextButton(
                     onPressed: () {
-                      setState(() { _area = null; _action = null; _actorUserId = null; _from = null; _until = null; _search.clear(); });
+                      setState(() {
+                        _area = null;
+                        _action = null;
+                        _actorUserId = null;
+                        _from = null;
+                        _until = null;
+                        _search.clear();
+                      });
                       _load();
                     },
                     child: const Text('Filter zurücksetzen'),
@@ -158,7 +180,10 @@ class _AuditLogPageState extends State<AuditLogPage> {
             if (_loading)
               const LinearProgressIndicator()
             else if (_error != null)
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error))
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              )
             else if (_items.isEmpty)
               const Text('Keine passenden Log-Einträge vorhanden.')
             else
@@ -167,7 +192,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   dense: true,
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.history),
-                  title: Text('${_actionLabel(item.action)} · ${item.actorName}'),
+                  title: Text(
+                    '${_actionLabel(item.action)} · ${item.actorName}',
+                  ),
                   subtitle: Text(
                     '${_dateTime(item.createdAt)} · ${_areaLabel(item.area)}${item.description == null ? '' : '\n${item.description}'}${item.entityId == null ? '' : '\nReferenz: ${item.entityId}'}',
                   ),
@@ -192,7 +219,10 @@ class _AuditLogPageState extends State<AuditLogPage> {
       decoration: InputDecoration(labelText: label),
       items: [
         const DropdownMenuItem(value: null, child: Text('Alle')),
-        ...values.map((item) => DropdownMenuItem(value: item, child: Text(labels[item] ?? item))),
+        ...values.map(
+          (item) =>
+              DropdownMenuItem(value: item, child: Text(labels[item] ?? item)),
+        ),
       ],
       onChanged: changed,
     ),
@@ -200,18 +230,50 @@ class _AuditLogPageState extends State<AuditLogPage> {
 }
 
 class _AuditEntry {
-  const _AuditEntry({required this.id, required this.createdAt, required this.actorName, required this.action, required this.area, this.actorUserId, this.entityId, this.description});
+  const _AuditEntry({
+    required this.id,
+    required this.createdAt,
+    required this.actorName,
+    required this.action,
+    required this.area,
+    this.actorUserId,
+    this.entityId,
+    this.description,
+  });
   factory _AuditEntry.fromJson(Map<String, dynamic> json) {
-    final metadata = json['metadata'] is Map ? Map<String, dynamic>.from(json['metadata'] as Map) : const <String, dynamic>{};
-    final description = metadata['description'] ?? metadata['title'] ?? metadata['name'] ?? metadata['fileName'];
-    return _AuditEntry(id: json['id'] as String, createdAt: DateTime.parse(json['createdAt'] as String).toLocal(), actorName: json['actorName'] as String? ?? 'System', actorUserId: json['actorUserId'] as String?, action: json['action'] as String, area: json['entityType'] as String, entityId: json['entityId'] as String?, description: description?.toString());
+    final metadata = json['metadata'] is Map
+        ? Map<String, dynamic>.from(json['metadata'] as Map)
+        : const <String, dynamic>{};
+    final description =
+        metadata['description'] ??
+        metadata['title'] ??
+        metadata['name'] ??
+        metadata['fileName'];
+    return _AuditEntry(
+      id: json['id'] as String,
+      createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
+      actorName: json['actorName'] as String? ?? 'System',
+      actorUserId: json['actorUserId'] as String?,
+      action: json['action'] as String,
+      area: json['entityType'] as String,
+      entityId: json['entityId'] as String?,
+      description: description?.toString(),
+    );
   }
   final String id, actorName, action, area;
   final String? actorUserId, entityId, description;
   final DateTime createdAt;
 }
 
-String _dateText(DateTime value) => '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
-String _dateTime(DateTime value) => '${_dateText(value)} – ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
-String _actionLabel(String value) => value.split('.').map((part) => part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}').join(' ');
+String _dateText(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}.${value.month.toString().padLeft(2, '0')}.${value.year}';
+String _dateTime(DateTime value) =>
+    '${_dateText(value)} – ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+String _actionLabel(String value) => value
+    .split('.')
+    .map(
+      (part) =>
+          part.isEmpty ? part : '${part[0].toUpperCase()}${part.substring(1)}',
+    )
+    .join(' ');
 String _areaLabel(String value) => value.replaceAll('_', ' ');

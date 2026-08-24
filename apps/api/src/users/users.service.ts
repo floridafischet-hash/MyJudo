@@ -70,11 +70,14 @@ export class UsersService {
     const user = await this.users.findOneBy({ id, organizationId: actor.organizationId });
     if (!user?.avatarStoredName || !user.avatarMimeType)
       throw new NotFoundException('Bild wurde nicht gefunden.');
-    return { mime: user.avatarMimeType, buffer: await readImage(this.avatarRoot(), user.avatarStoredName) };
+    return {
+      mime: user.avatarMimeType,
+      buffer: await readImage(this.avatarRoot(), user.avatarStoredName),
+    };
   }
 
-  async adminList(actor: AuthenticatedUser) {
-    return this.dataSource.query(
+  async adminList(actor: AuthenticatedUser): Promise<unknown[]> {
+    return await this.dataSource.query(
       `SELECT u.id, u.username, u.email, u."firstName", u."lastName", u.status, u.color, u."avatarStoredName",
        COALESCE((SELECT jsonb_agg(jsonb_build_object('id',g.id,'name',g.name,'color',g.color) ORDER BY g.name)
          FROM user_groups ug JOIN groups g ON g.id=ug."groupId" WHERE ug."userId"=u.id), '[]') groups,
@@ -104,7 +107,7 @@ export class UsersService {
       let saved: User;
       try {
         saved = await manager.getRepository(User).save(user);
-      } catch (error) {
+      } catch {
         throw new ConflictException('Benutzername oder E-Mail-Adresse ist bereits vergeben.');
       }
       await this.replaceAssignments(manager, actor, saved, dto.roleIds, dto.groupIds);
@@ -143,7 +146,7 @@ export class UsersService {
       if (dto.password) user.passwordHash = await this.passwords.hash(dto.password);
       try {
         await manager.getRepository(User).save(user);
-      } catch (error) {
+      } catch {
         throw new ConflictException('Benutzername oder E-Mail-Adresse ist bereits vergeben.');
       }
       await this.replaceAssignments(manager, actor, user, dto.roleIds, dto.groupIds);

@@ -71,5 +71,4 @@ class AuthController extends AsyncNotifier<AuthSession?> {
     }
     state = const AsyncData(null);
   }
-
 }

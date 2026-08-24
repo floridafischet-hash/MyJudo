@@ -549,6 +549,28 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _deleteMessage(ChatMessage message) async {
     final selected = _selected;
     if (selected == null) return;
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Nachricht wirklich löschen?'),
+            content: const Text(
+              'Die Nachricht wird für alle Beteiligten entfernt.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Abbrechen'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Löschen'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
     try {
       await _repository.deleteMessage(selected.id, message.id);
       if (!mounted) return;
@@ -661,7 +683,7 @@ class _ChatPageState extends State<ChatPage> {
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.red),
                 title: const Text(
-                  'Löschen',
+                  'Nachricht löschen',
                   style: TextStyle(color: Colors.red),
                 ),
                 onTap: () {
@@ -878,6 +900,7 @@ class _ChatPageState extends State<ChatPage> {
               : _messages.isEmpty
               ? const Center(child: Text('Noch keine Nachrichten.'))
               : ListView.builder(
+                  key: const Key('chat-message-list'),
                   controller: _scrollController,
                   reverse: true,
                   padding: const EdgeInsets.symmetric(
@@ -922,76 +945,93 @@ class _ChatPageState extends State<ChatPage> {
           child: _recording
               ? _buildRecordingBar()
               : Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // Emoji button
-              IconButton(
-                onPressed: _showEmojiPicker,
-                icon: Icon(
-                  _emojiPickerVisible
-                      ? Icons.keyboard_outlined
-                      : Icons.emoji_emotions_outlined,
-                ),
-                tooltip: 'Emoji',
-              ),
-              // Text field
-              Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  enabled: !_sending,
-                  maxLength: 4000,
-                  minLines: 1,
-                  maxLines: 4,
-                  textInputAction: TextInputAction.newline,
-                  onTap: () {
-                    if (_emojiPickerVisible) {
-                      setState(() => _emojiPickerVisible = false);
-                    }
-                  },
-                  decoration: const InputDecoration(
-                    hintText: 'Nachricht',
-                    counterText: '',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.all(Radius.circular(24)),
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Emoji button
+                    IconButton(
+                      key: const Key('emoji-button'),
+                      onPressed: _showEmojiPicker,
+                      icon: Icon(
+                        _emojiPickerVisible
+                            ? Icons.keyboard_outlined
+                            : Icons.emoji_emotions_outlined,
+                      ),
+                      tooltip: 'Emoji',
                     ),
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
+                    // Text field
+                    Expanded(
+                      child: Focus(
+                        onKeyEvent: (node, event) {
+                          if (event is KeyDownEvent &&
+                              event.logicalKey == LogicalKeyboardKey.enter &&
+                              !HardwareKeyboard.instance.isShiftPressed) {
+                            unawaited(_send());
+                            return KeyEventResult.handled;
+                          }
+                          return KeyEventResult.ignored;
+                        },
+                        child: TextField(
+                          key: const Key('chat-message-input'),
+                          controller: _messageController,
+                          enabled: !_sending,
+                          maxLength: 4000,
+                          minLines: 1,
+                          maxLines: 4,
+                          textInputAction: TextInputAction.newline,
+                          onTap: () {
+                            if (_emojiPickerVisible) {
+                              setState(() => _emojiPickerVisible = false);
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            hintText: 'Nachricht',
+                            counterText: '',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(24),
+                              ),
+                            ),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    // Voice button
+                    IconButton(
+                      onPressed: _sending ? null : _startRecording,
+                      icon: const Icon(Icons.mic_none_outlined),
+                      tooltip: 'Sprachnachricht aufnehmen',
+                    ),
+                    // Image button
+                    IconButton(
+                      onPressed: _sending ? null : _pickAndSendImage,
+                      icon: const Icon(Icons.photo_outlined),
+                      tooltip: 'Bild senden',
+                    ),
+                    // Send button
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _messageController,
+                      builder: (context, value, child) {
+                        final hasText = value.text.trim().isNotEmpty;
+                        return IconButton.filled(
+                          tooltip: 'Senden',
+                          onPressed: (!_sending && hasText) ? _send : null,
+                          icon: _sending
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ),
-              // Voice button
-              IconButton(
-                onPressed: _sending ? null : _startRecording,
-                icon: const Icon(Icons.mic_none_outlined),
-                tooltip: 'Sprachnachricht aufnehmen',
-              ),
-              // Image button
-              IconButton(
-                onPressed: _sending ? null : _pickAndSendImage,
-                icon: const Icon(Icons.photo_outlined),
-                tooltip: 'Bild senden',
-              ),
-              // Send button
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _messageController,
-                builder: (context, value, child) {
-                  final hasText = value.text.trim().isNotEmpty;
-                  return IconButton.filled(
-                    tooltip: 'Senden',
-                    onPressed: (!_sending && hasText) ? _send : null,
-                    icon: _sending
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.send),
-                  );
-                },
-              ),
-            ],
-          ),
         ),
       ],
     );
@@ -1130,7 +1170,7 @@ class _ChatList extends StatelessWidget {
                     trailing: chat.unreadCount > 0
                         ? Badge(label: Text('${chat.unreadCount}'))
                         : null,
-                    onTap: () => onSelect(chat),
+                    onTap: selectedId == chat.id ? null : () => onSelect(chat),
                   );
                 },
               ),
@@ -1159,6 +1199,7 @@ class _MessageBubble extends StatelessWidget {
     return Align(
       alignment: own ? Alignment.centerRight : Alignment.centerLeft,
       child: GestureDetector(
+        key: Key('message-menu-${message.id}'),
         onTap: onLongPress,
         onLongPress: onLongPress,
         child: Card(
@@ -1610,7 +1651,9 @@ class _VoicePlayerState extends State<_VoicePlayer> {
     final progress = total > 0
         ? (_position.inMilliseconds / total).clamp(0.0, 1.0)
         : 0.0;
-    final remaining = _duration > _position ? _duration - _position : Duration.zero;
+    final remaining = _duration > _position
+        ? _duration - _position
+        : Duration.zero;
     return ConstrainedBox(
       constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
       child: Row(
@@ -1621,7 +1664,10 @@ class _VoicePlayerState extends State<_VoicePlayer> {
                   dimension: 34,
                   child: Padding(
                     padding: const EdgeInsets.all(7),
-                    child: CircularProgressIndicator(strokeWidth: 2, color: accent),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: accent,
+                    ),
                   ),
                 )
               : IconButton(
@@ -1655,12 +1701,19 @@ class _VoicePlayerState extends State<_VoicePlayer> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Icon(Icons.mic, size: 13, color: color.withValues(alpha: 0.7)),
+                    Icon(
+                      Icons.mic,
+                      size: 13,
+                      color: color.withValues(alpha: 0.7),
+                    ),
                     const SizedBox(width: 3),
                     Text(
-                      _position > Duration.zero ? _fmt(_position) : _fmt(remaining),
-                      style: Theme.of(context).textTheme.labelSmall
-                          ?.copyWith(color: color.withValues(alpha: 0.8)),
+                      _position > Duration.zero
+                          ? _fmt(_position)
+                          : _fmt(remaining),
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: color.withValues(alpha: 0.8),
+                      ),
                     ),
                   ],
                 ),
@@ -1671,4 +1724,14 @@ class _VoicePlayerState extends State<_VoicePlayer> {
       ),
     );
   }
+}
+
+void insertEmoji(TextEditingController controller, String emoji) {
+  final selection = controller.selection;
+  final start = selection.isValid ? selection.start : controller.text.length;
+  final end = selection.isValid ? selection.end : controller.text.length;
+  controller.value = TextEditingValue(
+    text: controller.text.replaceRange(start, end, emoji),
+    selection: TextSelection.collapsed(offset: start + emoji.length),
+  );
 }

@@ -62,7 +62,10 @@ export function readImage(root: string, storedName: string): Promise<Buffer> {
   return readFile(join(root, storedName));
 }
 
-export async function deleteImage(root: string, storedName: string | null | undefined): Promise<void> {
+export async function deleteImage(
+  root: string,
+  storedName: string | null | undefined,
+): Promise<void> {
   if (!storedName) return;
   await unlink(join(root, storedName)).catch(() => undefined);
 }

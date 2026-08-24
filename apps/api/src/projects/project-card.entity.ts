@@ -9,6 +9,7 @@ export enum ProjectCardType {
   Appointment = 'appointment',
   Note = 'note',
   Checklist = 'checklist',
+  Image = 'image',
 }
 @Entity('project_cards')
 export class ProjectCard extends BaseEntity {
@@ -25,4 +26,7 @@ export class ProjectCard extends BaseEntity {
   @Column({ type: 'varchar', length: 160 }) title!: string;
   @Column({ type: 'text', nullable: true }) content!: string | null;
   @Column({ type: 'integer', default: 0 }) position!: number;
+  @Column({ type: 'varchar', length: 120, nullable: true }) imageStoredName!: string | null;
+  @Column({ type: 'varchar', length: 120, nullable: true }) imageMimeType!: string | null;
+  @Column({ type: 'varchar', length: 255, nullable: true }) imageOriginalName!: string | null;
 }

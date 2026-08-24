@@ -281,8 +281,14 @@ class _BrandPanel extends StatelessWidget {
 class _CompactBrand extends StatelessWidget {
   const _CompactBrand();
   @override
-  Widget build(BuildContext context) =>
-      const Align(alignment: Alignment.centerLeft, child: _LogoMark());
+  Widget build(BuildContext context) => const Align(
+    alignment: Alignment.centerLeft,
+    child: FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerLeft,
+      child: _LogoMark(),
+    ),
+  );
 }
 
 class _LogoMark extends StatelessWidget {

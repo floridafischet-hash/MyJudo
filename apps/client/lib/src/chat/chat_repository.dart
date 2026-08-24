@@ -45,7 +45,7 @@ class ChatRepository {
 
   Future<DirectoryPage> searchUsers(String search) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _dio.get<dynamic>(
         '/users/directory',
         queryParameters: {'search': search.trim(), 'pageSize': 20},
       );
@@ -69,14 +69,29 @@ class ChatRepository {
 
   Future<MessagePage> listMessages(String chatId, {String? before}) async {
     try {
-      final response = await _dio.get<Map<String, dynamic>>(
+      final response = await _dio.get<dynamic>(
         '/chats/$chatId/messages',
         queryParameters: chatMessageQueryParameters(before),
       );
-      return MessagePage.fromJson(response.data ?? const {});
+      final raw = response.data;
+      return MessagePage.fromJson(
+        raw is Map ? Map<String, dynamic>.from(raw) : const {},
+      );
     } on DioException catch (error) {
       throw ChatApiException(_messageFor(error));
     }
+  }
+
+  Future<List<ChatMessage>> listAllMessages(String chatId) async {
+    final messages = <ChatMessage>[];
+    String? before;
+    do {
+      final page = await listMessages(chatId, before: before);
+      messages.addAll(page.items);
+      before = page.nextBefore;
+    } while (before != null);
+    messages.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return messages;
   }
 
   Future<ChatMessage> send(
@@ -247,7 +262,11 @@ class ChatRepository {
     }
   }
 
-  Future<void> uploadChatAvatar(String id, Uint8List bytes, String filename) async {
+  Future<void> uploadChatAvatar(
+    String id,
+    Uint8List bytes,
+    String filename,
+  ) async {
     try {
       final data = FormData.fromMap({
         'avatar': MultipartFile.fromBytes(bytes, filename: filename),

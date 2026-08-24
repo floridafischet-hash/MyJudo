@@ -131,7 +131,9 @@ class _AvatarPickerState extends State<AvatarPicker> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bild konnte nicht hochgeladen werden.')),
+          const SnackBar(
+            content: Text('Bild konnte nicht hochgeladen werden.'),
+          ),
         );
       }
     } finally {

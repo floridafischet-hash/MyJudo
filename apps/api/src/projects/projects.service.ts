@@ -1,7 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DataSource, EntityManager, In } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
-import { User } from '../users/user.entity';
+import { deleteImage, readImage, resolveImageUpload, storeImage } from '../common/image-upload';
 import { ChecklistItem } from './checklist-item.entity';
 import {
   CreateCardDto,
@@ -24,6 +25,7 @@ export class ProjectsService {
   constructor(
     private readonly db: DataSource,
     @Optional() private readonly permissions?: PermissionService,
+    @Optional() private readonly config?: ConfigService,
   ) {}
   // Completed projects are excluded from the default list (see the separate
   // completed-projects view in the client) unless explicitly requested via
@@ -39,7 +41,7 @@ export class ProjectsService {
     const memberNames =
       `(SELECT string_agg(mu."firstName"||' '||mu."lastName", ', ' ORDER BY mu."firstName") ` +
       `FROM project_members pm2 JOIN users mu ON mu.id=pm2."userId" WHERE pm2."projectId"=p.id) members`;
-    const rows: Array<{ id: string }> = superuser
+    const rows = (superuser
       ? await this.db.query(
           `SELECT p.*,'admin' access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
           params,
@@ -47,7 +49,7 @@ export class ProjectsService {
       : await this.db.query(
           `SELECT p.*,pm.access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN project_members pm ON pm."projectId"=p.id AND pm."userId"=$2 JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
           params,
-        );
+        )) as unknown as Array<{ id: string }>;
     // Personal drag-and-drop order only applies to the default (active)
     // view; the completed-projects archive keeps its own recency order.
     if (status) return rows;
@@ -99,7 +101,7 @@ export class ProjectsService {
   }
   private async accessibleActiveProjectIds(actor: AuthenticatedUser): Promise<Set<string>> {
     const superuser = await this.isSuperuser(actor);
-    const rows: Array<{ id: string }> = superuser
+    const rows = (superuser
       ? await this.db.query(
           `SELECT id FROM projects WHERE "organizationId"=$1 AND "deletedAt" IS NULL AND status <> 'completed'`,
           [actor.organizationId],
@@ -107,7 +109,7 @@ export class ProjectsService {
       : await this.db.query(
           `SELECT p.id FROM projects p JOIN project_members pm ON pm."projectId"=p.id AND pm."userId"=$2 WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND p.status <> 'completed'`,
           [actor.organizationId, actor.id],
-        );
+        )) as unknown as Array<{ id: string }>;
     return new Set(rows.map((row) => row.id));
   }
   async detail(actor: AuthenticatedUser, id: string) {
@@ -116,15 +118,18 @@ export class ProjectsService {
       .getRepository(Project)
       .findOneBy({ id, organizationId: actor.organizationId });
     if (!project) throw new NotFoundException('Projekt wurde nicht gefunden.');
-    const members = await this.db.query(
+    const members = await queryRows<Record<string, unknown>>(
+      this.db,
       `SELECT pm."userId",pm.access,(u."firstName"||' '||u."lastName") name FROM project_members pm JOIN users u ON u.id=pm."userId" WHERE pm."projectId"=$1 ORDER BY name`,
       [id],
     );
-    const cards = await this.db.query(
+    const cards = await queryRows<Record<string, unknown>>(
+      this.db,
       `SELECT c.*,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'text',i.text,'completed',i.completed,'completedBy',i."completedBy") ORDER BY i.position,i."createdAt") FROM checklist_items i WHERE i."cardId"=c.id AND i."deletedAt" IS NULL),'[]') items FROM project_cards c WHERE c."projectId"=$1 AND c."deletedAt" IS NULL ORDER BY c.position,c."createdAt"`,
       [id],
     );
-    const activities = await this.db.query(
+    const activities = await queryRows<Record<string, unknown>>(
+      this.db,
       `SELECT a.*,(u."firstName"||' '||u."lastName") actor FROM project_activities a JOIN users u ON u.id=a."actorUserId" WHERE a."projectId"=$1 ORDER BY a."createdAt" DESC LIMIT 50`,
       [id],
     );
@@ -253,6 +258,54 @@ export class ProjectsService {
     await this.log(projectId, actor.id, 'card.created', `Eintrag „${card.title}“ erstellt.`);
     return card;
   }
+  async addImage(
+    actor: AuthenticatedUser,
+    projectId: string,
+    file: Express.Multer.File,
+    rawTitle?: string,
+  ) {
+    await this.access(actor, projectId, ProjectAccess.Edit);
+    const resolved = resolveImageUpload(file, 10 * 1024 * 1024);
+    const storedName = await storeImage(this.imageRoot(), file.buffer, resolved.extension);
+    try {
+      const count = await this.db.getRepository(ProjectCard).countBy({ projectId });
+      const card = await this.db.getRepository(ProjectCard).save({
+        projectId,
+        createdBy: actor.id,
+        type: ProjectCardType.Image,
+        title: rawTitle?.trim().slice(0, 160) || file.originalname.slice(0, 160),
+        content: null,
+        position: count,
+        imageStoredName: storedName,
+        imageMimeType: resolved.mime,
+        imageOriginalName: file.originalname.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 255),
+      });
+      await this.log(
+        projectId,
+        actor.id,
+        'project.image.created',
+        `Bild „${card.title}“ hinzugefügt.`,
+      );
+      return card;
+    } catch (error) {
+      await deleteImage(this.imageRoot(), storedName);
+      throw error;
+    }
+  }
+  async image(actor: AuthenticatedUser, projectId: string, cardId: string) {
+    await this.access(actor, projectId, ProjectAccess.Read);
+    const card = await this.db.getRepository(ProjectCard).findOneBy({
+      id: cardId,
+      projectId,
+      type: ProjectCardType.Image,
+    });
+    if (!card?.imageStoredName || !card.imageMimeType)
+      throw new NotFoundException('Projektbild wurde nicht gefunden.');
+    return {
+      mime: card.imageMimeType,
+      buffer: await readImage(this.imageRoot(), card.imageStoredName),
+    };
+  }
   async updateCard(
     actor: AuthenticatedUser,
     projectId: string,
@@ -345,6 +398,7 @@ export class ProjectsService {
         projectId,
       });
     });
+    await deleteImage(this.imageRoot(), card.imageStoredName);
   }
   async deleteProject(actor: AuthenticatedUser, id: string) {
     await this.access(actor, id, ProjectAccess.Admin);
@@ -414,6 +468,9 @@ export class ProjectsService {
       .getRepository(ProjectActivity)
       .save({ projectId, actorUserId, action, description });
   }
+  private imageRoot(): string {
+    return this.config?.get<string>('PROJECT_IMAGE_STORAGE_PATH') ?? '/app/data/project-images';
+  }
   private async assertUsersBelongToOrganization(
     manager: EntityManager,
     ids: string[],
@@ -427,4 +484,13 @@ export class ProjectsService {
     if (ids.some((id) => !found.has(id)))
       throw new NotFoundException('Mindestens ein ausgewählter Teilnehmer wurde nicht gefunden.');
   }
+}
+
+async function queryRows<T>(
+  manager: Pick<DataSource, 'query'>,
+  sql: string,
+  parameters: unknown[],
+): Promise<T[]> {
+  const result: unknown = await manager.query(sql, parameters);
+  return Array.isArray(result) ? (result as T[]) : [];
 }

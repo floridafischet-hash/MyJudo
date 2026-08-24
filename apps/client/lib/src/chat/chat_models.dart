@@ -115,8 +115,8 @@ class MessagePage {
 
   factory MessagePage.fromJson(Map<String, dynamic> json) => MessagePage(
     items: (json['items'] as List<dynamic>? ?? const [])
-        .whereType<Map<String, dynamic>>()
-        .map(ChatMessage.fromJson)
+        .whereType<Map>()
+        .map((item) => ChatMessage.fromJson(Map<String, dynamic>.from(item)))
         .toList(),
     nextBefore: json['nextBefore'] as String?,
   );

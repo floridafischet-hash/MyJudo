@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
 
@@ -625,6 +627,37 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
+  Future<void> _addImage() async {
+    final project = selected;
+    if (project == null) return;
+    final picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+      withData: true,
+    );
+    final file = picked?.files.single;
+    if (file?.bytes == null) return;
+    try {
+      await api.post(
+        '/projects/${project['id']}/images',
+        data: FormData.fromMap({
+          'title': file!.name,
+          'image': MultipartFile.fromBytes(file.bytes!, filename: file.name),
+        }),
+      );
+      await _open(project['id'] as String);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      final data = error.response?.data;
+      final message = data is Map && data['message'] != null
+          ? data['message'].toString()
+          : 'Das Bild konnte nicht hochgeladen werden.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _deleteProject() async {
     final p = selected;
     if (p == null) return;
@@ -1092,6 +1125,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 icon: const Icon(Icons.checklist),
                 label: const Text('Checkliste erstellen'),
               ),
+            if (editable)
+              FilledButton.icon(
+                onPressed: _addImage,
+                icon: const Icon(Icons.add_photo_alternate_outlined),
+                label: const Text('Bild hinzufügen'),
+              ),
             OutlinedButton.icon(
               onPressed: _addNote,
               icon: const Icon(Icons.note_add_outlined),
@@ -1139,6 +1178,14 @@ class _ProjectsPageState extends State<ProjectsPage> {
                               onPressed: () => _editNote(card),
                               icon: const Icon(Icons.edit_note),
                               label: const Text('Notiz bearbeiten'),
+                            ),
+                          ],
+                          if (card['type'] == 'image') ...[
+                            const SizedBox(height: 10),
+                            _AuthenticatedProjectImage(
+                              api: api,
+                              projectId: p['id'] as String,
+                              cardId: card['id'] as String,
                             ),
                           ],
                           if (card['type'] == 'checklist')
@@ -1330,6 +1377,52 @@ String _formatDate(String? iso) {
   return '${date.day.toString().padLeft(2, '0')}.'
       '${date.month.toString().padLeft(2, '0')}.'
       '${date.year}';
+}
+
+class _AuthenticatedProjectImage extends StatefulWidget {
+  const _AuthenticatedProjectImage({
+    required this.api,
+    required this.projectId,
+    required this.cardId,
+  });
+
+  final Dio api;
+  final String projectId;
+  final String cardId;
+
+  @override
+  State<_AuthenticatedProjectImage> createState() =>
+      _AuthenticatedProjectImageState();
+}
+
+class _AuthenticatedProjectImageState
+    extends State<_AuthenticatedProjectImage> {
+  late final Future<Uint8List> bytes = _load();
+
+  Future<Uint8List> _load() async {
+    final response = await widget.api.get<List<int>>(
+      '/projects/${widget.projectId}/images/${widget.cardId}',
+      options: Options(responseType: ResponseType.bytes),
+    );
+    return Uint8List.fromList(response.data ?? const []);
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List>(
+    future: bytes,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Text('Bild konnte nicht geladen werden.');
+      }
+      if (!snapshot.hasData) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(snapshot.data!, fit: BoxFit.contain),
+      );
+    },
+  );
 }
 
 // The blue highlight for project cards, tuned separately for light and dark

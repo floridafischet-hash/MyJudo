@@ -1065,7 +1065,10 @@ class _GroupDialogState extends State<_GroupDialog> {
             const SizedBox(height: 16),
             const Align(
               alignment: Alignment.centerLeft,
-              child: Text('Bild', style: TextStyle(fontWeight: FontWeight.w800)),
+              child: Text(
+                'Bild',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
             ),
             const SizedBox(height: 8),
             AvatarPicker(

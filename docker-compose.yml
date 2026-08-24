@@ -40,22 +40,25 @@ services:
       - download_data:/app/data/downloads
       - chat_image_data:/app/data/chat-images
       - avatar_data:/app/data/avatars
+      - project_image_data:/app/data/project-images
     networks: [frontend, backend]
 
   storage-init:
     image: alpine:3.22
-    command: ["sh", "-c", "chown -R 1000:1000 /data/downloads /data/chat-images /data/avatars"]
+    command: ["sh", "-c", "chown -R 1000:1000 /data/downloads /data/chat-images /data/avatars /data/project-images"]
     restart: "no"
     volumes:
       - download_data:/data/downloads
       - chat_image_data:/data/chat-images
       - avatar_data:/data/avatars
+      - project_image_data:/data/project-images
 
 volumes:
   postgres_data:
   download_data:
   chat_image_data:
   avatar_data:
+  project_image_data:
 
 networks:
   frontend:
