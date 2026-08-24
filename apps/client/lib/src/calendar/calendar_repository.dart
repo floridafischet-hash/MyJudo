@@ -16,12 +16,16 @@ class CalendarEventModel {
     this.groupIds = const [],
     this.participantIds = const [],
     this.color,
+    this.meetingProvider,
+    this.meetingUrl,
+    this.meetingNotes,
   });
   final String id, title, eventType, recurrence;
   final String? description, location, seriesId, color;
   final DateTime startsAt, endsAt;
   final int? reminderMinutes;
   final List<String> groupIds, participantIds;
+  final String? meetingProvider, meetingUrl, meetingNotes;
   factory CalendarEventModel.fromJson(Map<String, dynamic> j) =>
       CalendarEventModel(
         id: j['id'].toString(),
@@ -41,6 +45,9 @@ class CalendarEventModel {
             .map((x) => x.toString())
             .toList(),
         color: j['color']?.toString(),
+        meetingProvider: j['meetingProvider']?.toString(),
+        meetingUrl: j['meetingUrl']?.toString(),
+        meetingNotes: j['meetingNotes']?.toString(),
       );
 }
 

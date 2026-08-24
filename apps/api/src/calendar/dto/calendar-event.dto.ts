@@ -3,15 +3,18 @@ import {
   ArrayUnique,
   IsArray,
   IsDateString,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  IsUrl,
   IsUUID,
   Max,
   MaxLength,
   Min,
 } from 'class-validator';
+import { CalendarMeetingProvider } from '../calendar-event.entity';
 
 export class ListCalendarEventsDto {
   @IsDateString() from!: string;
@@ -34,6 +37,12 @@ export class SaveCalendarEventDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) recurrenceInterval?: number;
   @IsOptional() @IsDateString() recurrenceUntil?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) recurrenceCount?: number;
+  @IsOptional() @IsEnum(CalendarMeetingProvider) meetingProvider?: CalendarMeetingProvider;
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: true })
+  @MaxLength(2048)
+  meetingUrl?: string;
+  @IsOptional() @IsString() @MaxLength(500) meetingNotes?: string;
 }
 
 export class EventScopeDto {

@@ -1,9 +1,42 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../common/color_palette.dart';
 import '../training/training_models.dart';
 import '../training/training_calendar.dart' show fullDate, monthTitle, sameDay;
 import 'calendar_repository.dart';
 import '../downloads/download_file.dart';
+
+const _meetingProviders = {
+  'google_meet': 'Google Meet',
+  'microsoft_teams': 'Microsoft Teams',
+  'other': 'Anderer Anbieter',
+};
+
+String _meetingProviderLabel(String? provider) =>
+    _meetingProviders[provider] ?? 'Online-Meeting';
+
+// Opens the stored link in an external browser/app (never embedded), and
+// refuses anything that isn't a well-formed https URL - defense in depth on
+// top of the server-side check, in case a stale/tampered value ever reaches
+// the client.
+Future<void> _launchMeeting(BuildContext context, String url) async {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.scheme != 'https') {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Ungültiger Meeting-Link.')));
+    return;
+  }
+  final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!opened && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Meeting-Link konnte nicht geöffnet werden.'),
+      ),
+    );
+  }
+}
 
 const _defaultEventColor = Color(0xFF0B4F8A);
 const _defaultTrainingColor = Color(0xFF176FA5);
@@ -111,7 +144,11 @@ class _CalendarPanelState extends State<CalendarPanel> {
                 (e) => ListTile(
                   leading: CircleAvatar(
                     backgroundColor: _eventColor(e),
-                    child: const Icon(Icons.event, color: Colors.white, size: 18),
+                    child: const Icon(
+                      Icons.event,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                   ),
                   title: Text(e.title),
                   subtitle: Text(
@@ -177,9 +214,14 @@ class _CalendarPanelState extends State<CalendarPanel> {
               children: [
                 Text(fullDate(session.startsAt)),
                 Text('${_time(session.startsAt)}–${_time(session.endsAt)} Uhr'),
-                Text('Gruppe: ${session.groups.map((g) => g.name).join(' / ')}'),
+                Text(
+                  'Gruppe: ${session.groups.map((g) => g.name).join(' / ')}',
+                ),
                 const SizedBox(height: 20),
-                Text('Dein Status', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  'Dein Status',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 6),
                 Text(
                   status == 'yes'
@@ -208,7 +250,9 @@ class _CalendarPanelState extends State<CalendarPanel> {
                   Navigator.pop(dialogContext);
                   await widget.onVote(session, 'no');
                 },
-                icon: Icon(status == 'no' ? Icons.check_circle : Icons.cancel_outlined),
+                icon: Icon(
+                  status == 'no' ? Icons.check_circle : Icons.cancel_outlined,
+                ),
                 label: const Text('Absagen'),
               ),
             if (!session.cancelled && !session.locked)
@@ -218,7 +262,9 @@ class _CalendarPanelState extends State<CalendarPanel> {
                   Navigator.pop(dialogContext);
                   await widget.onVote(session, 'yes');
                 },
-                icon: Icon(status == 'yes' ? Icons.check_circle : Icons.how_to_reg),
+                icon: Icon(
+                  status == 'yes' ? Icons.check_circle : Icons.how_to_reg,
+                ),
                 label: const Text('Teilnehmen'),
               ),
             TextButton(
@@ -252,6 +298,24 @@ class _CalendarPanelState extends State<CalendarPanel> {
               Text(fullDate(e.startsAt)),
               Text('${_time(e.startsAt)}–${_time(e.endsAt)} Uhr'),
               if (e.location != null) Text('Ort: ${e.location}'),
+              if (e.meetingUrl != null) ...[
+                const SizedBox(height: 14),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton.icon(
+                    onPressed: () => _launchMeeting(c, e.meetingUrl!),
+                    icon: const Icon(Icons.videocam_outlined),
+                    label: const Text('Am Online-Meeting teilnehmen'),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _meetingProviderLabel(e.meetingProvider),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                if (e.meetingNotes != null && e.meetingNotes!.isNotEmpty)
+                  Text(e.meetingNotes!),
+              ],
               if (e.description != null) ...[
                 const SizedBox(height: 10),
                 Text(e.description!),
@@ -366,7 +430,7 @@ class _CalendarPanelState extends State<CalendarPanel> {
   }) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _EventDialog(
+      builder: (_) => EventDialog(
         event: e,
         date: date,
         copy: copy,
@@ -380,7 +444,20 @@ class _CalendarPanelState extends State<CalendarPanel> {
     try {
       await repo.save(id: e?.id, data: result, scope: scope, copy: copy);
       await _load();
-    } catch (x) {
+    } on DioException catch (x) {
+      if (mounted) {
+        final data = x.response?.data;
+        final rawMessage = data is Map ? data['message'] : null;
+        final message = rawMessage is String
+            ? rawMessage
+            : rawMessage is List && rawMessage.isNotEmpty
+            ? rawMessage.first.toString()
+            : 'Termin konnte nicht gespeichert werden.';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
+    } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -552,8 +629,7 @@ class _CalendarPanelState extends State<CalendarPanel> {
                                       mainAxisAlignment:
                                           MainAxisAlignment.center,
                                       children: [
-                                        for (final color
-                                            in dotColors.take(4))
+                                        for (final color in dotColors.take(4))
                                           Padding(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 1.5,
@@ -591,13 +667,14 @@ class _CalendarPanelState extends State<CalendarPanel> {
   }
 }
 
-class _EventDialog extends StatefulWidget {
-  const _EventDialog({
+class EventDialog extends StatefulWidget {
+  const EventDialog({
     this.event,
     this.date,
     this.copy = false,
     this.groups = const [],
     this.users = const [],
+    super.key,
   });
   final CalendarEventModel? event;
   final DateTime? date;
@@ -605,15 +682,17 @@ class _EventDialog extends StatefulWidget {
   final List<TrainingGroup> groups;
   final List<TrainingUser> users;
   @override
-  State<_EventDialog> createState() => _EventDialogState();
+  State<EventDialog> createState() => EventDialogState();
 }
 
-class _EventDialogState extends State<_EventDialog> {
+class EventDialogState extends State<EventDialog> {
   late final TextEditingController title, description, location;
+  late final TextEditingController meetingUrl, meetingNotes;
   late DateTime date;
   late TimeOfDay start, end;
   String recurrence = 'none';
   int? reminder;
+  String? meetingProvider;
   late final Set<String> groupIds, participantIds;
   @override
   void initState() {
@@ -629,6 +708,10 @@ class _EventDialogState extends State<_EventDialog> {
     title = TextEditingController(text: e?.title ?? '');
     description = TextEditingController(text: e?.description ?? '');
     location = TextEditingController(text: e?.location ?? '');
+    meetingUrl = TextEditingController(text: e?.meetingUrl ?? '')
+      ..addListener(_onMeetingFieldChanged);
+    meetingNotes = TextEditingController(text: e?.meetingNotes ?? '');
+    meetingProvider = e?.meetingProvider;
     reminder = e?.reminderMinutes;
     groupIds = {...?e?.groupIds};
     participantIds = {...?e?.participantIds};
@@ -636,6 +719,9 @@ class _EventDialogState extends State<_EventDialog> {
 
   DateTime _at(TimeOfDay t) =>
       DateTime(date.year, date.month, date.day, t.hour, t.minute);
+  void _onMeetingFieldChanged() => setState(() {});
+  bool get _meetingUrlValid =>
+      meetingProvider == null || meetingUrl.text.trim().startsWith('https://');
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
@@ -663,6 +749,47 @@ class _EventDialogState extends State<_EventDialog> {
             controller: location,
             decoration: const InputDecoration(labelText: 'Ort'),
           ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<String?>(
+            initialValue: meetingProvider,
+            decoration: const InputDecoration(labelText: 'Online-Meeting'),
+            items: const [
+              DropdownMenuItem(value: null, child: Text('Kein Online-Meeting')),
+              DropdownMenuItem(
+                value: 'google_meet',
+                child: Text('Google Meet'),
+              ),
+              DropdownMenuItem(
+                value: 'microsoft_teams',
+                child: Text('Microsoft Teams'),
+              ),
+              DropdownMenuItem(value: 'other', child: Text('Anderer Anbieter')),
+            ],
+            onChanged: (v) => setState(() => meetingProvider = v),
+          ),
+          if (meetingProvider != null) ...[
+            const SizedBox(height: 12),
+            TextField(
+              controller: meetingUrl,
+              decoration: InputDecoration(
+                labelText: 'Meeting-Link (https://…)',
+                hintText: 'https://meet.google.com/…',
+                errorText:
+                    meetingUrl.text.trim().isNotEmpty && !_meetingUrlValid
+                    ? 'Nur https-Links sind erlaubt.'
+                    : null,
+              ),
+              keyboardType: TextInputType.url,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: meetingNotes,
+              decoration: const InputDecoration(
+                labelText: 'Hinweise zum Meeting (optional)',
+                hintText: 'z. B. Zugangscode, Beitrittshinweise',
+              ),
+            ),
+          ],
           ListTile(
             title: Text(fullDate(date)),
             trailing: const Icon(Icons.calendar_month),
@@ -786,7 +913,7 @@ class _EventDialogState extends State<_EventDialog> {
         child: const Text('Abbrechen'),
       ),
       FilledButton(
-        onPressed: title.text.trim().isEmpty
+        onPressed: title.text.trim().isEmpty || !_meetingUrlValid
             ? null
             : () => Navigator.pop(context, {
                 'title': title.text.trim(),
@@ -800,6 +927,14 @@ class _EventDialogState extends State<_EventDialog> {
                 'participantIds': participantIds.toList(),
                 'recurrence': recurrence,
                 if (recurrence != 'none') 'recurrenceCount': 20,
+                'meetingProvider': meetingProvider,
+                'meetingUrl': meetingProvider == null
+                    ? null
+                    : meetingUrl.text.trim(),
+                'meetingNotes':
+                    meetingProvider == null || meetingNotes.text.trim().isEmpty
+                    ? null
+                    : meetingNotes.text.trim(),
               }),
         child: const Text('Speichern'),
       ),

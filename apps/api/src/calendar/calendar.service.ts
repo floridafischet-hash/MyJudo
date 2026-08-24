@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
 import { AuditLog } from '../audit/audit-log.entity';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PermissionService } from '../rbac/permission.service';
+import { meetingHostMatchesProvider } from './calendar-meeting.validation';
 import { CalendarEvent } from './calendar-event.entity';
 import { SaveCalendarEventDto } from './dto/calendar-event.dto';
 
@@ -54,6 +55,7 @@ export class CalendarService {
 
   async create(actor: AuthenticatedUser, dto: SaveCalendarEventDto) {
     await this.validateReferences(actor, dto);
+    this.validateMeeting(dto);
     const starts = new Date(dto.startsAt),
       ends = new Date(dto.endsAt);
     if (ends <= starts)
@@ -88,6 +90,9 @@ export class CalendarService {
             recurrenceInterval: dto.recurrenceInterval ?? 1,
             recurrenceUntil: dto.recurrenceUntil?.substring(0, 10) ?? null,
             recurrenceCount: dto.recurrenceCount ?? null,
+            meetingProvider: dto.meetingProvider ?? null,
+            meetingUrl: dto.meetingUrl ?? null,
+            meetingNotes: dto.meetingNotes?.trim() || null,
           }),
         ),
       );
@@ -96,6 +101,9 @@ export class CalendarService {
         title: dto.title,
         seriesId,
         occurrences: saved.length,
+        // Meeting presence/provider only - never the link or notes, which
+        // can carry a joinable/dial-in secret.
+        meetingProvider: dto.meetingProvider ?? null,
       });
       return first;
     });
@@ -104,6 +112,7 @@ export class CalendarService {
   async update(actor: AuthenticatedUser, id: string, dto: SaveCalendarEventDto, scope: string) {
     const current = await this.manageable(actor, id);
     await this.validateReferences(actor, dto);
+    this.validateMeeting(dto);
     const starts = new Date(dto.startsAt),
       ends = new Date(dto.endsAt);
     if (ends <= starts)
@@ -111,6 +120,9 @@ export class CalendarService {
     const targets = await this.targets(current, scope);
     const delta = starts.valueOf() - current.startsAt.valueOf();
     const duration = ends.valueOf() - starts.valueOf();
+    const meetingChanged =
+      current.meetingProvider !== (dto.meetingProvider ?? null) ||
+      current.meetingUrl !== (dto.meetingUrl ?? null);
     await this.data.transaction(async (manager) => {
       for (const [index, target] of targets.entries()) {
         target.title = dto.title.trim();
@@ -120,13 +132,21 @@ export class CalendarService {
         target.groupIds = dto.groupIds ?? [];
         target.participantIds = dto.participantIds ?? [];
         target.reminderMinutes = dto.reminderMinutes ?? null;
+        target.meetingProvider = dto.meetingProvider ?? null;
+        target.meetingUrl = dto.meetingUrl ?? null;
+        target.meetingNotes = dto.meetingNotes?.trim() || null;
         if (index === 0 || scope !== 'single') {
           target.startsAt = new Date(target.startsAt.valueOf() + delta);
           target.endsAt = new Date(target.startsAt.valueOf() + duration);
         }
       }
       await manager.getRepository(CalendarEvent).save(targets);
-      await this.audit(manager, actor, 'calendar.event.updated', id, { title: dto.title, scope });
+      await this.audit(manager, actor, 'calendar.event.updated', id, {
+        title: dto.title,
+        scope,
+        meetingProvider: dto.meetingProvider ?? null,
+        meetingChanged,
+      });
     });
     return this.events.findOneByOrFail({ id });
   }
@@ -226,17 +246,31 @@ export class CalendarService {
         throw new BadRequestException('Mindestens eine Zuordnung ist ungültig.');
     }
   }
+  // Provider and link are required together (a provider alone is
+  // meaningless, a link alone can't be labelled or checked). The DTO already
+  // enforces https-only; here we also cross-check the host against the
+  // chosen provider so a mislabeled or spoofed link is rejected server-side
+  // rather than trusted at face value.
+  private validateMeeting(dto: SaveCalendarEventDto): void {
+    const hasProvider = dto.meetingProvider !== undefined;
+    const hasUrl = dto.meetingUrl !== undefined;
+    if (hasProvider !== hasUrl)
+      throw new BadRequestException(
+        'Meeting-Anbieter und Meeting-Link müssen gemeinsam angegeben werden.',
+      );
+    if (!hasUrl) return;
+    if (!meetingHostMatchesProvider(dto.meetingUrl!, dto.meetingProvider!))
+      throw new BadRequestException('Der Meeting-Link passt nicht zum ausgewählten Anbieter.');
+  }
   private audit(manager: any, actor: AuthenticatedUser, action: string, id: string, metadata: any) {
-    return manager
-      .getRepository(AuditLog)
-      .save({
-        organizationId: actor.organizationId,
-        actorUserId: actor.id,
-        action,
-        entityType: 'calendar_event',
-        entityId: id,
-        outcome: 'success',
-        metadata,
-      });
+    return manager.getRepository(AuditLog).save({
+      organizationId: actor.organizationId,
+      actorUserId: actor.id,
+      action,
+      entityType: 'calendar_event',
+      entityId: id,
+      outcome: 'success',
+      metadata,
+    });
   }
 }

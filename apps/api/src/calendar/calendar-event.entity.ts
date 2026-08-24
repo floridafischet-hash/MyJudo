@@ -1,6 +1,12 @@
 import { Column, Entity, Index } from 'typeorm';
 import { BaseEntity } from '../common/base.entity';
 
+export enum CalendarMeetingProvider {
+  GoogleMeet = 'google_meet',
+  MicrosoftTeams = 'microsoft_teams',
+  Other = 'other',
+}
+
 @Entity('calendar_events')
 @Index(['organizationId', 'startsAt'])
 @Index(['seriesId', 'startsAt'])
@@ -21,4 +27,13 @@ export class CalendarEvent extends BaseEntity {
   @Column({ type: 'integer', default: 1 }) recurrenceInterval!: number;
   @Column({ type: 'date', nullable: true }) recurrenceUntil!: string | null;
   @Column({ type: 'integer', nullable: true }) recurrenceCount!: number | null;
+  @Column({
+    type: 'enum',
+    enum: CalendarMeetingProvider,
+    enumName: 'calendar_meeting_provider_enum',
+    nullable: true,
+  })
+  meetingProvider!: CalendarMeetingProvider | null;
+  @Column({ type: 'varchar', length: 2048, nullable: true }) meetingUrl!: string | null;
+  @Column({ type: 'varchar', length: 500, nullable: true }) meetingNotes!: string | null;
 }
