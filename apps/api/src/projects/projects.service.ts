@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException, Optional } from '@nestjs/common';
-import { DataSource, EntityManager } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { User } from '../users/user.entity';
 import { ChecklistItem } from './checklist-item.entity';
@@ -7,12 +7,14 @@ import {
   CreateCardDto,
   CreateProjectDto,
   ChecklistItemDto,
+  ReorderProjectsDto,
   UpdateCardDto,
   UpdateProjectDto,
 } from './dto/project.dto';
 import { ProjectActivity } from './project-activity.entity';
 import { ProjectCard, ProjectCardType } from './project-card.entity';
 import { ProjectAccess, ProjectMember } from './project-member.entity';
+import { ProjectOrder } from './project-order.entity';
 import { Project, ProjectStatus } from './project.entity';
 import { PermissionService } from '../rbac/permission.service';
 import { AuditLog } from '../audit/audit-log.entity';
@@ -37,15 +39,76 @@ export class ProjectsService {
     const memberNames =
       `(SELECT string_agg(mu."firstName"||' '||mu."lastName", ', ' ORDER BY mu."firstName") ` +
       `FROM project_members pm2 JOIN users mu ON mu.id=pm2."userId" WHERE pm2."projectId"=p.id) members`;
-    if (superuser)
-      return this.db.query(
-        `SELECT p.*,'admin' access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
-        params,
-      );
-    return this.db.query(
-      `SELECT p.*,pm.access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN project_members pm ON pm."projectId"=p.id AND pm."userId"=$2 JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
-      params,
-    );
+    const rows: Array<{ id: string }> = superuser
+      ? await this.db.query(
+          `SELECT p.*,'admin' access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
+          params,
+        )
+      : await this.db.query(
+          `SELECT p.*,pm.access,(u."firstName"||' '||u."lastName") creator,${memberNames} FROM projects p JOIN project_members pm ON pm."projectId"=p.id AND pm."userId"=$2 JOIN users u ON u.id=p."createdBy" WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND ${statusClause} ORDER BY p."updatedAt" DESC`,
+          params,
+        );
+    // Personal drag-and-drop order only applies to the default (active)
+    // view; the completed-projects archive keeps its own recency order.
+    if (status) return rows;
+    return this.applyPersonalOrder(actor, rows);
+  }
+  // Positioned projects come first (by the user's saved position); anything
+  // without a saved position - new projects, or projects the user has never
+  // reordered - keeps its original (most-recently-updated-first) relative
+  // order and is appended after the positioned ones.
+  private async applyPersonalOrder<T extends { id: string }>(
+    actor: AuthenticatedUser,
+    rows: T[],
+  ): Promise<T[]> {
+    const order = await this.db.getRepository(ProjectOrder).findBy({ userId: actor.id });
+    if (!order.length) return rows;
+    const position = new Map(order.map((entry) => [entry.projectId, entry.position]));
+    return [...rows].sort((a, b) => {
+      const pa = position.get(a.id);
+      const pb = position.get(b.id);
+      if (pa !== undefined && pb !== undefined) return pa - pb;
+      if (pa !== undefined) return -1;
+      if (pb !== undefined) return 1;
+      return 0;
+    });
+  }
+  // Reorders only the projects the caller can currently see in their active
+  // list. Positions for completed or inaccessible projects are left
+  // untouched, so completing/reopening a project can never corrupt another
+  // project's position, and a stale/foreign id can never be injected.
+  async reorder(actor: AuthenticatedUser, dto: ReorderProjectsDto): Promise<void> {
+    const accessible = await this.accessibleActiveProjectIds(actor);
+    const requested = dto.order.filter((id) => accessible.has(id));
+    const missing = [...accessible].filter((id) => !requested.includes(id));
+    const finalOrder = [...requested, ...missing];
+    await this.db.transaction(async (m) => {
+      await m
+        .getRepository(ProjectOrder)
+        .delete({ userId: actor.id, projectId: In([...accessible]) });
+      if (finalOrder.length)
+        await m
+          .getRepository(ProjectOrder)
+          .insert(
+            finalOrder.map((projectId, position) => ({ userId: actor.id, projectId, position })),
+          );
+    });
+  }
+  async resetOrder(actor: AuthenticatedUser): Promise<void> {
+    await this.db.getRepository(ProjectOrder).delete({ userId: actor.id });
+  }
+  private async accessibleActiveProjectIds(actor: AuthenticatedUser): Promise<Set<string>> {
+    const superuser = await this.isSuperuser(actor);
+    const rows: Array<{ id: string }> = superuser
+      ? await this.db.query(
+          `SELECT id FROM projects WHERE "organizationId"=$1 AND "deletedAt" IS NULL AND status <> 'completed'`,
+          [actor.organizationId],
+        )
+      : await this.db.query(
+          `SELECT p.id FROM projects p JOIN project_members pm ON pm."projectId"=p.id AND pm."userId"=$2 WHERE p."organizationId"=$1 AND p."deletedAt" IS NULL AND p.status <> 'completed'`,
+          [actor.organizationId, actor.id],
+        );
+    return new Set(rows.map((row) => row.id));
   }
   async detail(actor: AuthenticatedUser, id: string) {
     const access = await this.access(actor, id, ProjectAccess.Read);

@@ -26,6 +26,9 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Abgeschlossene Projekte'), findsOneWidget);
+    // The reset-order action only makes sense once there is more than one
+    // project to order, so it stays hidden on the (network-less) empty list.
+    expect(find.text('Reihenfolge zurücksetzen'), findsNothing);
 
     await tester.tap(find.text('Abgeschlossene Projekte'));
     await tester.pumpAndSettle();

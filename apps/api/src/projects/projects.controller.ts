@@ -22,6 +22,7 @@ import {
   CreateCardDto,
   CreateProjectDto,
   ListProjectsDto,
+  ReorderProjectsDto,
   UpdateCardDto,
   UpdateProjectDto,
 } from './dto/project.dto';
@@ -33,6 +34,14 @@ export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
   @Get() list(@Req() r: R, @Query() query: ListProjectsDto) {
     return this.projects.list(r.user, query.status);
+  }
+  // Registered before the ":id" routes below so "order" is never matched as
+  // a project id.
+  @Put('order') @HttpCode(204) reorder(@Req() r: R, @Body() dto: ReorderProjectsDto) {
+    return this.projects.reorder(r.user, dto);
+  }
+  @Post('order/reset') @HttpCode(204) resetOrder(@Req() r: R) {
+    return this.projects.resetOrder(r.user);
   }
   @Get(':id') detail(@Req() r: R, @Param('id', new ParseUUIDPipe({ version: '4' })) id: string) {
     return this.projects.detail(r.user, id);

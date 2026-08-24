@@ -50,17 +50,37 @@ describe('ProjectsService permissions', () => {
 
   it('excludes completed projects from the default list', async () => {
     const query = jest.fn().mockResolvedValue([]);
-    const db = { query } as unknown as DataSource;
+    const findBy = jest.fn().mockResolvedValue([]);
+    const db = {
+      query,
+      getRepository: jest.fn().mockReturnValue({ findBy }),
+    } as unknown as DataSource;
     await new ProjectsService(db).list(actor);
-    expect(query.mock.calls[0][0] as string).toContain(`p.status <> 'completed'`);
-    expect(query.mock.calls[0][1]).toEqual([actor.organizationId, actor.id]);
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain(`p.status <> 'completed'`);
+    expect(params).toEqual([actor.organizationId, actor.id]);
   });
 
   it('filters to a single status when explicitly requested', async () => {
     const query = jest.fn().mockResolvedValue([]);
     const db = { query } as unknown as DataSource;
     await new ProjectsService(db).list(actor, ProjectStatus.Completed);
-    expect(query.mock.calls[0][0] as string).toContain('p.status = $3');
-    expect(query.mock.calls[0][1]).toEqual([actor.organizationId, actor.id, 'completed']);
+    const [sql, params] = query.mock.calls[0] as [string, unknown[]];
+    expect(sql).toContain('p.status = $3');
+    expect(params).toEqual([actor.organizationId, actor.id, 'completed']);
+  });
+
+  it("sorts the active list by the caller's saved positions, appending unpositioned projects at the end", async () => {
+    const query = jest.fn().mockResolvedValue([{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]);
+    const findBy = jest.fn().mockResolvedValue([
+      { userId: actor.id, projectId: 'c', position: 0 },
+      { userId: actor.id, projectId: 'a', position: 1 },
+    ]);
+    const db = {
+      query,
+      getRepository: jest.fn().mockReturnValue({ findBy }),
+    } as unknown as DataSource;
+    const result = await new ProjectsService(db).list(actor);
+    expect(result.map((p: { id: string }) => p.id)).toEqual(['c', 'a', 'b', 'd']);
   });
 });

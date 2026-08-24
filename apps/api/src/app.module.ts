@@ -43,6 +43,7 @@ import { ProjectMember } from './projects/project-member.entity';
 import { ProjectCard } from './projects/project-card.entity';
 import { ChecklistItem } from './projects/checklist-item.entity';
 import { ProjectActivity } from './projects/project-activity.entity';
+import { ProjectOrder } from './projects/project-order.entity';
 import { MemberGraduation, MemberQualification } from './members/member-graduation.entity';
 import { MemberImportJob } from './members/member-import-job.entity';
 import { CalendarEvent } from './calendar/calendar-event.entity';
@@ -85,6 +86,7 @@ import { AuditModule } from './audit/audit.module';
           ProjectCard,
           ChecklistItem,
           ProjectActivity,
+          ProjectOrder,
           MemberGraduation,
           MemberQualification,
           MemberImportJob,

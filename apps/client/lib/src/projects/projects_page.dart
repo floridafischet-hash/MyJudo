@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
@@ -38,6 +40,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   Map<String, dynamic>? selected;
   bool showCompleted = false;
   bool loading = true;
+  Timer? _orderSaveTimer;
   @override
   void initState() {
     super.initState();
@@ -46,6 +49,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
 
   @override
   void dispose() {
+    _orderSaveTimer?.cancel();
     api.close();
     super.dispose();
   }
@@ -75,6 +79,56 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final r = await api.get<dynamic>('/projects/$id');
     if (mounted) {
       setState(() => selected = Map<String, dynamic>.from(r.data as Map));
+    }
+  }
+
+  void _reorderProjects(int oldIndex, int newIndex) {
+    setState(() => projects = reorderedList(projects, oldIndex, newIndex));
+    _scheduleOrderSave();
+  }
+
+  void _moveProject(int index, int delta) {
+    final newIndex = index + delta;
+    if (newIndex < 0 || newIndex >= projects.length) return;
+    setState(() => projects = reorderedList(projects, index, newIndex));
+    _scheduleOrderSave();
+  }
+
+  // Several drags/moves in quick succession only persist once, shortly
+  // after the last one settles - not on every intermediate step.
+  void _scheduleOrderSave() {
+    _orderSaveTimer?.cancel();
+    _orderSaveTimer = Timer(const Duration(milliseconds: 500), _saveOrder);
+  }
+
+  Future<void> _saveOrder() async {
+    final order = projects.map((raw) => (raw as Map)['id'] as String).toList();
+    try {
+      await api.put('/projects/order', data: {'order': order});
+    } catch (_) {
+      // A transient failure to persist shouldn't disrupt the current view;
+      // the order simply reverts to the last saved state on next reload.
+    }
+  }
+
+  Future<void> _resetOrder() async {
+    _orderSaveTimer?.cancel();
+    try {
+      await api.post('/projects/order/reset');
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Reihenfolge wurde zurückgesetzt.')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Reihenfolge konnte nicht zurückgesetzt werden.'),
+          ),
+        );
+      }
     }
   }
 
@@ -834,15 +888,23 @@ class _ProjectsPageState extends State<ProjectsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.canCreate)
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: _create,
-              icon: const Icon(Icons.add),
-              label: const Text('Projekt erstellen'),
-            ),
-          ),
+        Row(
+          children: [
+            if (projects.length > 1)
+              TextButton.icon(
+                onPressed: _resetOrder,
+                icon: const Icon(Icons.restart_alt),
+                label: const Text('Reihenfolge zurücksetzen'),
+              ),
+            const Spacer(),
+            if (widget.canCreate)
+              FilledButton.icon(
+                onPressed: _create,
+                icon: const Icon(Icons.add),
+                label: const Text('Projekt erstellen'),
+              ),
+          ],
+        ),
         const SizedBox(height: 16),
         if (projects.isEmpty)
           const Card(
@@ -850,50 +912,27 @@ class _ProjectsPageState extends State<ProjectsPage> {
               padding: EdgeInsets.all(24),
               child: Text('Du bist aktuell keinem Projekt zugeordnet.'),
             ),
+          )
+        else
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: projects.length,
+            onReorderItem: _reorderProjects,
+            itemBuilder: (context, index) {
+              final p = Map<String, dynamic>.from(projects[index] as Map);
+              return _ProjectTile(
+                key: ValueKey(p['id']),
+                project: p,
+                palette: palette,
+                index: index,
+                lastIndex: projects.length - 1,
+                onOpen: () => _open(p['id'] as String),
+                onMove: (delta) => _moveProject(index, delta),
+              );
+            },
           ),
-        Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          children: projects.map((raw) {
-            final p = Map<String, dynamic>.from(raw as Map);
-            return SizedBox(
-              width: 320,
-              child: Card(
-                color: palette.background,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(18),
-                  side: BorderSide(color: palette.border, width: 1.4),
-                ),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(18),
-                  onTap: () => _open(p['id'] as String),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.dashboard_customize_outlined,
-                          color: palette.accent,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          p['title'] as String,
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        Text(
-                          p['description'] as String? ?? 'Keine Beschreibung',
-                        ),
-                        const SizedBox(height: 10),
-                        _statusBadge(p['status'] as String, palette),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
         const SizedBox(height: 20),
         Align(
           alignment: Alignment.bottomRight,
@@ -1159,6 +1198,105 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ],
     );
   }
+}
+
+// One draggable row in the active project list. The default reorder handle
+// (mouse drag on desktop/web, long-press-drag on touch) is provided by
+// ReorderableListView itself; the up/down buttons are a keyboard- and
+// screen-reader-operable alternative to dragging (see requirement to keep
+// reordering accessible without a pointer).
+class _ProjectTile extends StatelessWidget {
+  const _ProjectTile({
+    required super.key,
+    required this.project,
+    required this.palette,
+    required this.index,
+    required this.lastIndex,
+    required this.onOpen,
+    required this.onMove,
+  });
+
+  final Map<String, dynamic> project;
+  final _ProjectPalette palette;
+  final int index;
+  final int lastIndex;
+  final VoidCallback onOpen;
+  final void Function(int delta) onMove;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 16),
+    child: Card(
+      color: palette.background,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: palette.border, width: 1.4),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.dashboard_customize_outlined, color: palette.accent),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      project['title'] as String,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    Text(
+                      project['description'] as String? ?? 'Keine Beschreibung',
+                    ),
+                    const SizedBox(height: 10),
+                    _statusBadge(project['status'] as String, palette),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Nach oben verschieben',
+                    onPressed: index == 0 ? null : () => onMove(-1),
+                    icon: const Icon(Icons.keyboard_arrow_up),
+                  ),
+                  IconButton(
+                    tooltip: 'Nach unten verschieben',
+                    onPressed: index == lastIndex ? null : () => onMove(1),
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                  ),
+                ],
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 8),
+                  child: Icon(Icons.drag_handle, color: palette.accent),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+// Pure list move used by both drag-and-drop (onReorderItem, newIndex already
+// adjusted for the removed item) and the up/down buttons, kept separate from
+// State so it can be unit tested without pumping a widget tree.
+List<T> reorderedList<T>(List<T> list, int oldIndex, int newIndex) {
+  final copy = [...list];
+  final moved = copy.removeAt(oldIndex);
+  copy.insert(newIndex, moved);
+  return copy;
 }
 
 Widget _statusBadge(String status, _ProjectPalette palette) => Container(

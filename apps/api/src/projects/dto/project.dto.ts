@@ -29,6 +29,9 @@ export class InitialChecklistDto {
 export class ListProjectsDto {
   @IsOptional() @IsEnum(ProjectStatus) status?: ProjectStatus;
 }
+export class ReorderProjectsDto {
+  @IsArray() @ArrayUnique() @IsUUID('4', { each: true }) order!: string[];
+}
 export class CreateProjectDto {
   @IsString() @MinLength(1) @MaxLength(160) title!: string;
   @IsOptional() @IsString() @MaxLength(1000) description?: string;
