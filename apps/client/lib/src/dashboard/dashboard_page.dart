@@ -109,7 +109,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     super.dispose();
   }
 
-  static const destinations = [
+  static const _mainDestinations = [
     NavigationDestination(icon: Icon(Icons.home_outlined), label: 'Home'),
     NavigationDestination(
       icon: Icon(Icons.calendar_month_outlined),
@@ -131,11 +131,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       icon: Icon(Icons.download_outlined),
       label: 'Downloads',
     ),
-    NavigationDestination(
-      icon: Icon(Icons.settings_outlined),
-      label: 'Einstellungen',
-    ),
   ];
+
+  static const _settingsDestination = NavigationDestination(
+    icon: Icon(Icons.settings_outlined),
+    label: 'Einstellungen',
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +190,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   NavigationDestinationLabelBehavior.onlyShowSelected,
               onDestinationSelected: (index) =>
                   _onDestinationSelected(index, session?.accessToken),
-              destinations: _destinationsWithBadges(),
+              destinations: _destinationsWithBadges(
+                session?.isSuperuser ?? false,
+              ),
             ),
           );
         }
@@ -248,17 +251,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       ),
                     ),
                   ),
-                  destinations: _destinationsWithBadges()
-                      .map(
-                        (item) => NavigationRailDestination(
-                          icon: item.icon,
-                          label: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            child: Text(item.label),
-                          ),
-                        ),
-                      )
-                      .toList(),
+                  destinations:
+                      _destinationsWithBadges(session?.isSuperuser ?? false)
+                          .map(
+                            (item) => NavigationRailDestination(
+                              icon: item.icon,
+                              label: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                child: Text(item.label),
+                              ),
+                            ),
+                          )
+                          .toList(),
                 ),
               ),
               Expanded(child: content),
@@ -269,28 +275,30 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     );
   }
 
-  List<NavigationDestination> _destinationsWithBadges() =>
-      destinations.asMap().entries.map((entry) {
-        if (entry.key == 2 && _unreadMessages > 0) {
-          return NavigationDestination(
-            icon: Badge(
-              label: Text('$_unreadMessages'),
-              child: entry.value.icon,
-            ),
-            label: 'Kommunikation',
-          );
-        }
-        if (entry.key == 4 && _newProjectsCount > 0) {
-          return NavigationDestination(
-            icon: Badge(
-              label: Text('$_newProjectsCount'),
-              child: entry.value.icon,
-            ),
-            label: 'Projekte',
-          );
-        }
-        return entry.value;
-      }).toList();
+  List<NavigationDestination> _destinationsWithBadges(bool isSuperuser) {
+    final destinations = [
+      ..._mainDestinations,
+      if (isSuperuser) _settingsDestination,
+    ];
+    return destinations.asMap().entries.map((entry) {
+      if (entry.key == 2 && _unreadMessages > 0) {
+        return NavigationDestination(
+          icon: Badge(label: Text('$_unreadMessages'), child: entry.value.icon),
+          label: 'Kommunikation',
+        );
+      }
+      if (entry.key == 4 && _newProjectsCount > 0) {
+        return NavigationDestination(
+          icon: Badge(
+            label: Text('$_newProjectsCount'),
+            child: entry.value.icon,
+          ),
+          label: 'Projekte',
+        );
+      }
+      return entry.value;
+    }).toList();
+  }
 }
 
 // Below this width the home layout stacks projects above upcoming events;
@@ -417,22 +425,22 @@ class _Content extends ConsumerWidget {
             token: accessToken!,
             admin: permissions.contains('roles.manage'),
           )
-        else if (index == 6 && accessToken != null) ...[
+        else if (index == 6 && accessToken != null && isSuperuser) ...[
           NotificationSettingsPage(accessToken: accessToken!),
           const SizedBox(height: 28),
           HomeCalendarSummary(token: accessToken!, showUpcoming: false),
-          if (permissions.contains('roles.manage')) ...[
-            const SizedBox(height: 28),
-            ChatAdminPage(accessToken: accessToken!),
-            const SizedBox(height: 28),
-            UserManagementPage(accessToken: accessToken!, embedded: true),
-            const SizedBox(height: 28),
-            MemberExcelImportPage(accessToken: accessToken!),
-          ],
-          if (isSuperuser) ...[
-            const SizedBox(height: 28),
-            AuditLogPage(accessToken: accessToken!),
-          ],
+          const SizedBox(height: 28),
+          ChatAdminPage(accessToken: accessToken!),
+          const SizedBox(height: 28),
+          UserManagementPage(
+            accessToken: accessToken!,
+            currentUserId: currentUserId!,
+            embedded: true,
+          ),
+          const SizedBox(height: 28),
+          MemberExcelImportPage(accessToken: accessToken!),
+          const SizedBox(height: 28),
+          AuditLogPage(accessToken: accessToken!),
         ] else
           const _ModuleInProgress(),
       ],
@@ -475,7 +483,12 @@ class _Content extends ConsumerWidget {
       children: [
         Expanded(flex: 2, child: projects),
         const SizedBox(width: 24),
-        Expanded(child: upcoming),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 136),
+            child: upcoming,
+          ),
+        ),
       ],
     );
   }

@@ -2,6 +2,7 @@ import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PermissionGuard } from './permission.guard';
 import { PermissionService } from './permission.service';
+import { REQUIRED_PERMISSIONS, SUPERUSER_REQUIRED } from './permissions.decorator';
 
 function contextWithUser(user?: {
   id: string;
@@ -22,13 +23,21 @@ describe('PermissionGuard', () => {
 
   beforeEach(() => jest.clearAllMocks());
 
+  function metadata(required: string[] = [], superuserRequired = false) {
+    jest.spyOn(reflector, 'getAllAndOverride').mockImplementation((key: unknown) => {
+      if (key === SUPERUSER_REQUIRED) return superuserRequired;
+      if (key === REQUIRED_PERMISSIONS) return required;
+      return undefined;
+    });
+  }
+
   it('rejects an unauthenticated request for protected permissions', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['members.export']);
+    metadata(['members.export']);
     await expect(guard.canActivate(contextWithUser())).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects a user without all required permissions', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['chat.psg.access']);
+    metadata(['chat.psg.access']);
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(false);
     await expect(
       guard.canActivate(
@@ -42,7 +51,7 @@ describe('PermissionGuard', () => {
   });
 
   it('allows a user only after the server-side permission lookup succeeds', async () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['members.view']);
+    metadata(['members.view']);
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(true);
     await expect(
       guard.canActivate(
@@ -63,9 +72,21 @@ describe('PermissionGuard', () => {
     });
     jest.spyOn(permissions, 'hasRole').mockResolvedValue(true);
     jest.spyOn(permissions, 'hasAll').mockResolvedValue(false);
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['roles.manage']);
+    metadata(['roles.manage']);
     await expect(guard.canActivate(user)).resolves.toBe(true);
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['chat.psg.access']);
+    metadata(['chat.psg.access']);
     await expect(guard.canActivate(user)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('requires the local Superuser role even when a user has roles.manage', async () => {
+    metadata([], true);
+    jest.spyOn(permissions, 'hasRole').mockResolvedValue(false);
+    const hasAll = jest.spyOn(permissions, 'hasAll').mockResolvedValue(true);
+    await expect(
+      guard.canActivate(
+        contextWithUser({ id: 'user', organizationId: 'org', authorizationVersion: 0 }),
+      ),
+    ).rejects.toThrow('ausschließlich für Superuser');
+    expect(hasAll).not.toHaveBeenCalled();
   });
 });

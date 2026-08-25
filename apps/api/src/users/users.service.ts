@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
@@ -165,6 +170,31 @@ export class UsersService {
         },
       });
       return { id: user.id };
+    });
+  }
+
+  async deleteManaged(actor: AuthenticatedUser, id: string): Promise<void> {
+    if (id === actor.id) {
+      throw new BadRequestException('Das eigene Superuser-Konto kann nicht gelöscht werden.');
+    }
+    await this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(User);
+      const user = await repository.findOneBy({ id, organizationId: actor.organizationId });
+      if (!user) throw new NotFoundException('Benutzer wurde nicht gefunden.');
+
+      user.authorizationVersion += 1;
+      await repository.save(user);
+      await repository.softRemove(user);
+      await manager.getRepository(AuditLog).save({
+        organizationId: actor.organizationId,
+        actorUserId: actor.id,
+        action: 'user.deleted',
+        entityType: 'user',
+        entityId: user.id,
+        outcome: 'success',
+        metadata: { displayName: `${user.firstName} ${user.lastName}`.trim() },
+      });
+      await deleteImage(this.avatarRoot(), user.avatarStoredName);
     });
   }
 

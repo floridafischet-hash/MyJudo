@@ -4,7 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PermissionGuard } from './permission.guard';
-import { RequirePermissions } from './permissions.decorator';
+import { RequireSuperuser } from './permissions.decorator';
 import { Role } from './role.entity';
 
 interface RoleRequest {
@@ -17,7 +17,7 @@ export class RolesController {
   constructor(@InjectRepository(Role) private readonly roles: Repository<Role>) {}
 
   @Get()
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   async list(@Req() request: RoleRequest): Promise<Array<{ id: string; name: string }>> {
     const roles = await this.roles.find({
       where: { organizationId: request.user.organizationId },

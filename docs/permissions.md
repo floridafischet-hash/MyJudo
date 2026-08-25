@@ -8,6 +8,12 @@ Fachrollen und Permissions.
 Superuser-Zugriff erfordert die lokale Rolle `Superuser`. Diese Rolle enthält
 `chat.psg.access` bewusst nicht; PSG bleibt separat geschützt.
 
+Die Einstellungen und die Benutzerverwaltung sind ausschließlich für
+Superuser sichtbar. Benutzer anlegen, bearbeiten, löschen und Rollen zuweisen
+werden zusätzlich serverseitig auf die Rolle `Superuser` geprüft. Die
+Permission `roles.manage` allein reicht dafür ausdrücklich nicht. Das eigene
+Superuser-Konto kann nicht gelöscht werden.
+
 Jeder Zugriff prüft mindestens gültige Authentifizierung, aktiven
 Benutzerstatus, Organisation/Mandant, konkrete Permission und Objektbezug.
 Rollenänderungen erhöhen die `authorizationVersion`, wodurch bereits

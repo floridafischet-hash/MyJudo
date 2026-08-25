@@ -24,7 +24,7 @@ import { AuthGuard } from '@nestjs/passport';
 import type { Response } from 'express';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PermissionGuard } from '../rbac/permission.guard';
-import { RequirePermissions } from '../rbac/permissions.decorator';
+import { RequirePermissions, RequireSuperuser } from '../rbac/permissions.decorator';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { UserStatus } from './user-status.enum';
 import { UsersService, UserSummary } from './users.service';
@@ -62,19 +62,19 @@ export class UsersController {
   }
 
   @Get('admin')
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   adminList(@Req() request: UserRequest) {
     return this.users.adminList(request.user);
   }
 
   @Post('admin')
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   create(@Req() request: UserRequest, @Body() dto: CreateManagedUserDto) {
     return this.users.createManaged(request.user, dto);
   }
 
   @Put('admin/:id')
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   update(
     @Req() request: UserRequest,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
@@ -93,7 +93,7 @@ export class UsersController {
   }
 
   @Put(':id/roles')
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   assignRoles(
     @Req() request: UserRequest,
     @Param('id', new ParseUUIDPipe({ version: '4' })) userId: string,
@@ -103,7 +103,7 @@ export class UsersController {
   }
 
   @Post('admin/:id/avatar')
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   @UseInterceptors(FileInterceptor('avatar', { limits: { fileSize: 5 * 1024 * 1024 } }))
   uploadAvatar(
     @Req() request: UserRequest,
@@ -115,12 +115,22 @@ export class UsersController {
 
   @Delete('admin/:id/avatar')
   @HttpCode(204)
-  @RequirePermissions('roles.manage')
+  @RequireSuperuser()
   deleteAvatar(
     @Req() request: UserRequest,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ) {
     return this.users.deleteAvatar(request.user, id);
+  }
+
+  @Delete('admin/:id')
+  @HttpCode(204)
+  @RequireSuperuser()
+  delete(
+    @Req() request: UserRequest,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.users.deleteManaged(request.user, id);
   }
 
   @Get(':id/avatar')

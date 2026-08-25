@@ -9,10 +9,12 @@ import '../common/color_palette.dart';
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({
     required this.accessToken,
+    required this.currentUserId,
     this.embedded = false,
     super.key,
   });
   final String accessToken;
+  final String currentUserId;
   final bool embedded;
   @override
   State<UserManagementPage> createState() => _UserManagementPageState();
@@ -116,6 +118,45 @@ class _UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
+  Future<void> _delete(Map<String, dynamic> user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Benutzer wirklich löschen?'),
+        content: Text(
+          '${user['firstName']} ${user['lastName']} wird gelöscht und kann sich nicht mehr anmelden.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await api.delete('/users/admin/${user['id']}');
+      await _load();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Benutzer wurde gelöscht.')),
+        );
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_message(e))));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
@@ -176,10 +217,24 @@ class _UserManagementPageState extends State<UserManagementPage> {
                   '@${u['username']} · ${u['email']}\n${gs.map((g) => g['name']).join(', ')} · ${rs.map((r) => r['name']).join(', ')} · ${u['status']}',
                 ),
                 isThreeLine: true,
-                trailing: IconButton(
-                  tooltip: 'Bearbeiten',
-                  onPressed: () => _edit(u),
-                  icon: const Icon(Icons.edit_outlined),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Bearbeiten',
+                      onPressed: () => _edit(u),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    if (u['id'] != widget.currentUserId)
+                      IconButton(
+                        tooltip: 'Löschen',
+                        onPressed: () => _delete(u),
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             );
