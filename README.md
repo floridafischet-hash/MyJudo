@@ -67,6 +67,9 @@ Weiterführende Dokumente: [Architektur](docs/architecture.md),
 [Datenbank](docs/database.md) und
 [Implementierungsplan](docs/implementation-plan.md).
 
+Für Vereinsmitglieder ohne Technik-Hintergrund gibt es zudem ein
+laienverständliches [Benutzerhandbuch](docs/benutzerhandbuch.md).
+
 ## Projektstruktur
 
 ```
