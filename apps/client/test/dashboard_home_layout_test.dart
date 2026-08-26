@@ -7,16 +7,16 @@ import 'package:myjudo_client/src/auth/auth_session.dart';
 
 void main() {
   testWidgets(
-    'places projects left with more room and upcoming events right on wide screens',
+    'places calendar left at two thirds and overview right on wide screens',
     (tester) async {
       _setScreenSize(tester, const Size(1400, 900));
       await tester.pumpWidget(_signedInApp());
       await tester.pumpAndSettle();
 
-      final projectsColumn = tester.getRect(
+      final calendarColumn = tester.getRect(
         find
             .ancestor(
-              of: find.text('Pinnwand'),
+              of: find.text('Kalender'),
               matching: find.byType(Expanded),
             )
             .first,
@@ -29,26 +29,30 @@ void main() {
             )
             .first,
       );
-      // Same row (side by side), projects on the left, and visibly more room
-      // for projects than for the compact upcoming-events column.
-      expect(projectsColumn.top, upcomingColumn.top);
-      expect(projectsColumn.left, lessThan(upcomingColumn.left));
-      expect(projectsColumn.width, greaterThan(upcomingColumn.width));
+      final projects = tester.getRect(find.text('Pinnwand'));
+      final upcoming = tester.getRect(find.text('Kommende Termine'));
+
+      expect(calendarColumn.top, upcomingColumn.top);
+      expect(calendarColumn.left, lessThan(upcomingColumn.left));
+      expect(calendarColumn.width / upcomingColumn.width, closeTo(2, 0.05));
+      expect(upcoming.top, lessThan(projects.top));
 
       expect(tester.takeException(), isNull);
     },
   );
 
   testWidgets(
-    'stacks projects above upcoming events on narrow screens without overflow',
+    'stacks calendar, upcoming events and projects on narrow screens',
     (tester) async {
       _setScreenSize(tester, const Size(390, 844));
       await tester.pumpWidget(_signedInApp());
       await tester.pumpAndSettle();
 
-      final projects = tester.getRect(find.text('Pinnwand'));
+      final calendar = tester.getRect(find.text('Kalender'));
       final upcoming = tester.getRect(find.text('Kommende Termine'));
-      expect(projects.top, lessThan(upcoming.top));
+      final projects = tester.getRect(find.text('Pinnwand'));
+      expect(calendar.top, lessThan(upcoming.top));
+      expect(upcoming.top, lessThan(projects.top));
 
       expect(tester.takeException(), isNull);
     },

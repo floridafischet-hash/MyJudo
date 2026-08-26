@@ -301,9 +301,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
   }
 }
 
-// Below this width the home layout stacks projects above upcoming events;
-// at/above it there is enough room for both side by side without cramping
-// the compact "Kommende Termine" column (see _Content._homeOverview).
+// Below this width the dashboard columns stack at full width. At/above it,
+// the calendar uses two thirds and the overview column one third.
 const _homeSideBySideBreakpoint = 1000.0;
 
 class _Content extends ConsumerWidget {
@@ -353,19 +352,6 @@ class _Content extends ConsumerWidget {
         const SizedBox(height: 28),
         if (index == 0 && accessToken != null) ...[
           _homeOverview(context, accessToken!),
-          const SizedBox(height: 34),
-          const Text(
-            'Kalender',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 14),
-          TrainingPage(
-            accessToken: accessToken!,
-            canManage: permissions.contains('training.manage'),
-            embedded: true,
-            showCalendar: true,
-            calendarOnly: true,
-          ),
         ] else if (index == 1 && accessToken != null)
           TrainingPage(
             accessToken: accessToken!,
@@ -447,10 +433,27 @@ class _Content extends ConsumerWidget {
     );
   }
 
-  // On large screens the project overview sits left with more room, and the
-  // compact upcoming-events summary sits right; on narrow screens they stack
-  // so nothing is squeezed or cut off (see _homeSideBySideBreakpoint).
+  // On large screens the calendar takes two thirds of the available width;
+  // upcoming events and projects share the remaining third. On narrow screens
+  // all sections stack at full width.
   Widget _homeOverview(BuildContext context, String accessToken) {
+    final calendar = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Kalender',
+          style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 14),
+        TrainingPage(
+          accessToken: accessToken,
+          canManage: permissions.contains('training.manage'),
+          embedded: true,
+          showCalendar: true,
+          calendarOnly: true,
+        ),
+      ],
+    );
     final projects = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -471,24 +474,23 @@ class _Content extends ConsumerWidget {
       maxUpcoming: 3,
       onViewAllUpcoming: onOpenCalendar,
     );
+    final overview = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [upcoming, const SizedBox(height: 30), projects],
+    );
     final wide = MediaQuery.sizeOf(context).width >= _homeSideBySideBreakpoint;
     if (!wide) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [projects, const SizedBox(height: 30), upcoming],
+        children: [calendar, const SizedBox(height: 30), overview],
       );
     }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 2, child: projects),
+        Expanded(flex: 2, child: calendar),
         const SizedBox(width: 24),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 136),
-            child: upcoming,
-          ),
-        ),
+        Expanded(child: overview),
       ],
     );
   }
