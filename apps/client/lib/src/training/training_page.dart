@@ -95,6 +95,7 @@ class _TrainingPageState extends State<TrainingPage> {
       groups: groups,
       users: users,
     );
+    if (widget.calendarOnly) return personal;
     if (!widget.canManage) return personal;
     if (widget.embedded) {
       final sections = <(String, Widget)>[
