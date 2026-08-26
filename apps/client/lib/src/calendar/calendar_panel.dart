@@ -428,7 +428,9 @@ class _CalendarPanelState extends State<CalendarPanel> {
     DateTime? date,
     bool copy = false,
   }) async {
-    final result = await showDialog<Map<String, dynamic>>(
+    final scope = e == null || copy ? 'single' : await _scope(e, 'ändern');
+    if (scope == null || !mounted) return;
+    final saved = await showDialog<bool>(
       context: context,
       builder: (_) => EventDialog(
         event: e,
@@ -436,36 +438,11 @@ class _CalendarPanelState extends State<CalendarPanel> {
         copy: copy,
         groups: widget.groups,
         users: widget.users,
+        onSave: (data) =>
+            repo.save(id: e?.id, data: data, scope: scope, copy: copy),
       ),
     );
-    if (result == null || !mounted) return;
-    final scope = e == null || copy ? 'single' : await _scope(e, 'ändern');
-    if (scope == null) return;
-    try {
-      await repo.save(id: e?.id, data: result, scope: scope, copy: copy);
-      await _load();
-    } on DioException catch (x) {
-      if (mounted) {
-        final data = x.response?.data;
-        final rawMessage = data is Map ? data['message'] : null;
-        final message = rawMessage is String
-            ? rawMessage
-            : rawMessage is List && rawMessage.isNotEmpty
-            ? rawMessage.first.toString()
-            : 'Termin konnte nicht gespeichert werden.';
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(message)));
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Termin konnte nicht gespeichert werden.'),
-          ),
-        );
-      }
-    }
+    if (saved == true && mounted) await _load();
   }
 
   @override
@@ -674,6 +651,7 @@ class EventDialog extends StatefulWidget {
     this.copy = false,
     this.groups = const [],
     this.users = const [],
+    this.onSave,
     super.key,
   });
   final CalendarEventModel? event;
@@ -681,6 +659,7 @@ class EventDialog extends StatefulWidget {
   final bool copy;
   final List<TrainingGroup> groups;
   final List<TrainingUser> users;
+  final Future<void> Function(Map<String, dynamic>)? onSave;
   @override
   State<EventDialog> createState() => EventDialogState();
 }
@@ -693,6 +672,8 @@ class EventDialogState extends State<EventDialog> {
   String recurrence = 'none';
   int? reminder;
   String? meetingProvider;
+  String? formError;
+  bool saving = false;
   late final Set<String> groupIds, participantIds;
   @override
   void initState() {
@@ -705,7 +686,8 @@ class EventDialogState extends State<EventDialog> {
     end = TimeOfDay.fromDateTime(
       e?.endsAt ?? DateTime(d.year, d.month, d.day, 19),
     );
-    title = TextEditingController(text: e?.title ?? '');
+    title = TextEditingController(text: e?.title ?? '')
+      ..addListener(_onMeetingFieldChanged);
     description = TextEditingController(text: e?.description ?? '');
     location = TextEditingController(text: e?.location ?? '');
     meetingUrl = TextEditingController(text: e?.meetingUrl ?? '')
@@ -720,6 +702,16 @@ class EventDialogState extends State<EventDialog> {
   DateTime _at(TimeOfDay t) =>
       DateTime(date.year, date.month, date.day, t.hour, t.minute);
   void _onMeetingFieldChanged() => setState(() {});
+  @override
+  void dispose() {
+    title.dispose();
+    description.dispose();
+    location.dispose();
+    meetingUrl.dispose();
+    meetingNotes.dispose();
+    super.dispose();
+  }
+
   bool get _meetingUrlValid =>
       meetingProvider == null || meetingUrl.text.trim().startsWith('https://');
   @override
@@ -736,6 +728,14 @@ class EventDialogState extends State<EventDialog> {
       child: ListView(
         shrinkWrap: true,
         children: [
+          if (formError != null) ...[
+            Text(
+              formError!,
+              key: const Key('event-form-error'),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: title,
             decoration: const InputDecoration(labelText: 'Titel'),
@@ -765,7 +765,16 @@ class EventDialogState extends State<EventDialog> {
               ),
               DropdownMenuItem(value: 'other', child: Text('Anderer Anbieter')),
             ],
-            onChanged: (v) => setState(() => meetingProvider = v),
+            onChanged: saving
+                ? null
+                : (v) => setState(() {
+                    meetingProvider = v;
+                    formError = null;
+                    if (v == null) {
+                      meetingUrl.clear();
+                      meetingNotes.clear();
+                    }
+                  }),
           ),
           if (meetingProvider != null) ...[
             const SizedBox(height: 12),
@@ -909,34 +918,73 @@ class EventDialogState extends State<EventDialog> {
     ),
     actions: [
       TextButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: saving ? null : () => Navigator.pop(context),
         child: const Text('Abbrechen'),
       ),
       FilledButton(
-        onPressed: title.text.trim().isEmpty || !_meetingUrlValid
+        onPressed: title.text.trim().isEmpty || !_meetingUrlValid || saving
             ? null
-            : () => Navigator.pop(context, {
-                'title': title.text.trim(),
-                'description': description.text.trim(),
-                'location': location.text.trim(),
-                'eventType': 'event',
-                'startsAt': _at(start).toUtc().toIso8601String(),
-                'endsAt': _at(end).toUtc().toIso8601String(),
-                'reminderMinutes': reminder,
-                'groupIds': groupIds.toList(),
-                'participantIds': participantIds.toList(),
-                'recurrence': recurrence,
-                if (recurrence != 'none') 'recurrenceCount': 20,
-                'meetingProvider': meetingProvider,
-                'meetingUrl': meetingProvider == null
-                    ? null
-                    : meetingUrl.text.trim(),
-                'meetingNotes':
-                    meetingProvider == null || meetingNotes.text.trim().isEmpty
-                    ? null
-                    : meetingNotes.text.trim(),
-              }),
-        child: const Text('Speichern'),
+            : () async {
+                final data = <String, dynamic>{
+                  'title': title.text.trim(),
+                  'description': description.text.trim(),
+                  'location': location.text.trim(),
+                  'eventType': 'event',
+                  'startsAt': _at(start).toUtc().toIso8601String(),
+                  'endsAt': _at(end).toUtc().toIso8601String(),
+                  'reminderMinutes': reminder,
+                  'groupIds': groupIds.toList(),
+                  'participantIds': participantIds.toList(),
+                  'recurrence': recurrence,
+                  if (recurrence != 'none') 'recurrenceCount': 20,
+                  'meetingProvider': meetingProvider,
+                  'meetingUrl': meetingProvider == null
+                      ? null
+                      : meetingUrl.text.trim(),
+                  'meetingNotes':
+                      meetingProvider == null ||
+                          meetingNotes.text.trim().isEmpty
+                      ? null
+                      : meetingNotes.text.trim(),
+                };
+                setState(() {
+                  saving = true;
+                  formError = null;
+                });
+                if (widget.onSave == null) {
+                  Navigator.pop(context, data);
+                  return;
+                }
+                try {
+                  await widget.onSave!(data);
+                  if (context.mounted) Navigator.pop(context, true);
+                } on DioException catch (error) {
+                  final body = error.response?.data;
+                  final raw = body is Map ? body['message'] : null;
+                  if (mounted) {
+                    setState(() {
+                      saving = false;
+                      formError = raw is List
+                          ? raw.join('\n')
+                          : raw?.toString() ??
+                                'Termin konnte nicht gespeichert werden.';
+                    });
+                  }
+                } catch (_) {
+                  if (mounted) {
+                    setState(() {
+                      saving = false;
+                      formError = 'Termin konnte nicht gespeichert werden.';
+                    });
+                  }
+                }
+              },
+        child: saving
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Text('Speichern'),
       ),
     ],
   );

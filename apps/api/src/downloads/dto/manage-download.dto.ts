@@ -27,6 +27,12 @@ export class ManageDownloadDto {
   @IsString() @MinLength(1) @MaxLength(160) title!: string;
   @IsOptional() @IsString() @MaxLength(1000) description?: string;
   @IsEnum(DownloadCategory) category!: DownloadCategory;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.length > 0 ? value : undefined,
+  )
+  @IsOptional()
+  @IsUUID('4')
+  categoryId?: string;
   @Transform(({ value }) => value === true || value === 'true')
   @IsBoolean()
   availableToAll!: boolean;
@@ -46,4 +52,15 @@ export class ManageDownloadDto {
   @ArrayUnique()
   @IsUUID('4', { each: true })
   userIds!: string[];
+}
+export class DownloadCategoryDto {
+  @IsString() @MinLength(1) @MaxLength(120) name!: string;
+}
+export class MoveDownloadDto {
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.length > 0 ? value : undefined,
+  )
+  @IsOptional()
+  @IsUUID('4')
+  categoryId?: string;
 }

@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { ProjectStatus } from './project.entity';
 import { ProjectsService } from './projects.service';
+import { PermissionService } from '../rbac/permission.service';
 
 describe('ProjectsService permissions', () => {
   const actor: AuthenticatedUser = {
@@ -16,6 +17,18 @@ describe('ProjectsService permissions', () => {
     await expect(new ProjectsService(db).detail(actor, 'project-1')).rejects.toBeInstanceOf(
       ForbiddenException,
     );
+  });
+
+  it('prevents a superuser from crossing organization boundaries by direct project id', async () => {
+    const db = {
+      getRepository: jest.fn().mockReturnValue({ existsBy: jest.fn().mockResolvedValue(false) }),
+    } as unknown as DataSource;
+    const permissions = {
+      hasRole: jest.fn().mockResolvedValue(true),
+    } as unknown as PermissionService;
+    await expect(
+      new ProjectsService(db, permissions).detail(actor, 'foreign-project'),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('prevents a read-only participant from creating checklist cards', async () => {

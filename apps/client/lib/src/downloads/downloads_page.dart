@@ -23,6 +23,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
     ),
   );
   List<dynamic> items = [];
+  List<Map<String, dynamic>> categories = [];
+  String search = '';
   bool loading = true;
   @override
   void initState() {
@@ -37,12 +39,18 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   Future<void> load() async {
-    final r = await api.get<List<dynamic>>(
-      widget.admin ? '/downloads/admin/all' : '/downloads',
-    );
+    final results = await Future.wait([
+      api.get<List<dynamic>>(
+        widget.admin ? '/downloads/admin/all' : '/downloads',
+      ),
+      api.get<List<dynamic>>('/downloads/categories'),
+    ]);
     if (mounted) {
       setState(() {
-        items = r.data ?? [];
+        items = results[0].data ?? [];
+        categories = (results[1].data ?? [])
+            .map((value) => Map<String, dynamic>.from(value as Map))
+            .toList();
         loading = false;
       });
     }
@@ -98,7 +106,19 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final picked = await FilePicker.pickFiles(
       withData: true,
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'docx', 'xlsx'],
+      allowedExtensions: [
+        'pdf',
+        'png',
+        'jpg',
+        'jpeg',
+        'gif',
+        'webp',
+        'txt',
+        'csv',
+        'docx',
+        'xlsx',
+        'pptx',
+      ],
     );
     if (picked == null || !mounted) return;
     final title = TextEditingController(
@@ -107,7 +127,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
     final description = TextEditingController(
       text: existing?['description'] as String? ?? '',
     );
-    var selectedCategory = existing?['category'] as String? ?? 'graduation';
+    String? selectedCategoryId = existing?['categoryId'] as String?;
     final optionsResponse = await api.get<dynamic>('/downloads/admin/options');
     if (!mounted) return;
     final accessOptions = Map<String, dynamic>.from(
@@ -144,25 +164,22 @@ class _DownloadsPageState extends State<DownloadsPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedCategory,
+                  DropdownButtonFormField<String?>(
+                    initialValue: selectedCategoryId,
                     decoration: const InputDecoration(labelText: 'Kategorie'),
-                    items:
-                        const {
-                              'graduation': 'Graduierungsübersichten',
-                              'club': 'Vereinsdokumente',
-                              'training': 'Trainingsunterlagen',
-                              'form': 'Formulare',
-                              'other': 'Sonstiges',
-                            }.entries
-                            .map(
-                              (e) => DropdownMenuItem(
-                                value: e.key,
-                                child: Text(e.value),
-                              ),
-                            )
-                            .toList(),
-                    onChanged: (v) => setDialog(() => selectedCategory = v!),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('Ohne Kategorie'),
+                      ),
+                      ...categories.map(
+                        (e) => DropdownMenuItem<String?>(
+                          value: e['id'] as String,
+                          child: Text(e['name'] as String),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) => setDialog(() => selectedCategoryId = v),
                   ),
                   const SizedBox(height: 12),
                   SwitchListTile(
@@ -221,7 +238,8 @@ class _DownloadsPageState extends State<DownloadsPage> {
         data: FormData.fromMap({
           'title': title.text,
           'description': description.text,
-          'category': selectedCategory,
+          'category': existing?['category'] ?? 'other',
+          'categoryId': selectedCategoryId,
           'availableToAll': '$availableToAll',
           'active': 'true',
           'groupIds': jsonEncode(groupIds.toList()),
@@ -242,6 +260,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
         'title': d['title'],
         'description': d['description'] ?? '',
         'category': d['category'],
+        'categoryId': d['categoryId'],
         'availableToAll': '${d['availableToAll'] ?? true}',
         'active': '$active',
         'groupIds': jsonEncode(d['groupIds'] as List? ?? const []),
@@ -253,25 +272,188 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   Future<void> remove(Map<dynamic, dynamic> d) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Datei löschen?'),
+        content: Text('Möchtest du „${d['title']}“ wirklich löschen?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
     await api.delete('/downloads/admin/${d['id']}');
     await load();
+  }
+
+  Future<void> createCategory() async {
+    final value = TextEditingController();
+    final ok = await _categoryDialog('Kategorie erstellen', value);
+    if (ok == true && value.text.trim().isNotEmpty) {
+      await api.post(
+        '/downloads/categories',
+        data: {'name': value.text.trim()},
+      );
+      await load();
+    }
+    value.dispose();
+  }
+
+  Future<void> renameCategory(Map<String, dynamic> category) async {
+    final value = TextEditingController(text: category['name'] as String);
+    final ok = await _categoryDialog('Kategorie umbenennen', value);
+    if (ok == true && value.text.trim().isNotEmpty) {
+      await api.patch(
+        '/downloads/categories/${category['id']}',
+        data: {'name': value.text.trim()},
+      );
+      await load();
+    }
+    value.dispose();
+  }
+
+  Future<bool?> _categoryDialog(String title, TextEditingController value) =>
+      showDialog<bool>(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: value,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Speichern'),
+            ),
+          ],
+        ),
+      );
+  Future<void> deleteCategory(Map<String, dynamic> category) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Kategorie löschen?'),
+        content: const Text(
+          'Alle enthaltenen Dateien bleiben erhalten und werden nach „Ohne Kategorie“ verschoben.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await api.delete('/downloads/categories/${category['id']}');
+      await load();
+    }
+  }
+
+  Future<void> move(Map<dynamic, dynamic> file) async {
+    String? target = file['categoryId'] as String?;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => StatefulBuilder(
+        builder: (c, setDialog) => AlertDialog(
+          title: const Text('Datei verschieben'),
+          content: DropdownButtonFormField<String?>(
+            initialValue: target,
+            items: [
+              const DropdownMenuItem<String?>(
+                value: null,
+                child: Text('Ohne Kategorie'),
+              ),
+              ...categories.map(
+                (e) => DropdownMenuItem<String?>(
+                  value: e['id'] as String,
+                  child: Text(e['name'] as String),
+                ),
+              ),
+            ],
+            onChanged: (v) => setDialog(() => target = v),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Abbrechen'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Verschieben'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (ok == true) {
+      await api.patch(
+        '/downloads/admin/${file['id']}/category',
+        data: {'categoryId': target},
+      );
+      await load();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
+    final visible = items.where((raw) {
+      final d = raw as Map;
+      return '${d['title']} ${d['originalName']} ${d['description'] ?? ''}'
+          .toLowerCase()
+          .contains(search.toLowerCase());
+    }).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (widget.admin)
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton.icon(
-              onPressed: upload,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Datei hochladen'),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          alignment: WrapAlignment.end,
+          children: [
+            SizedBox(
+              width: 320,
+              child: TextField(
+                onChanged: (value) => setState(() => search = value),
+                decoration: const InputDecoration(
+                  prefixIcon: Icon(Icons.search),
+                  labelText: 'Downloads durchsuchen',
+                ),
+              ),
             ),
-          ),
+            if (widget.admin)
+              OutlinedButton.icon(
+                onPressed: createCategory,
+                icon: const Icon(Icons.create_new_folder_outlined),
+                label: const Text('Kategorie erstellen'),
+              ),
+            if (widget.admin)
+              FilledButton.icon(
+                onPressed: upload,
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Datei hochladen'),
+              ),
+          ],
+        ),
         const SizedBox(height: 16),
         if (items.isEmpty)
           const Card(
@@ -280,62 +462,93 @@ class _DownloadsPageState extends State<DownloadsPage> {
               child: Text('Keine freigegebenen Downloads vorhanden.'),
             ),
           ),
-        ...items.map((raw) {
-          final d = raw as Map<dynamic, dynamic>;
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.description_outlined),
-              title: Text(d['title'] as String),
-              subtitle: Text(
-                d['description'] as String? ??
-                    category(d['category'] as String),
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _PreviewButton(
-                    mime: d['mimeType'] as String,
-                    onTap: () => preview(d),
-                  ),
-                  IconButton(
-                    onPressed: () => download(d),
-                    icon: const Icon(Icons.download),
-                    tooltip: 'Herunterladen',
-                  ),
-                  if (widget.admin)
-                    PopupMenuButton<String>(
-                      onSelected: (v) {
-                        if (v == 'replace') upload(d);
-                        if (v == 'toggle') setActive(d, !(d['active'] as bool));
-                        if (v == 'delete') remove(d);
-                      },
-                      itemBuilder: (_) => [
-                        const PopupMenuItem(
-                          value: 'replace',
-                          child: Text('Datei ersetzen'),
-                        ),
-                        PopupMenuItem(
-                          value: 'toggle',
-                          child: Text(
-                            (d['active'] as bool)
-                                ? 'Deaktivieren'
-                                : 'Aktivieren',
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Löschen'),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-          );
-        }),
+        _categorySection(
+          null,
+          'Ohne Kategorie',
+          visible.where((raw) => (raw as Map)['categoryId'] == null).toList(),
+        ),
+        ...categories.map(
+          (folder) => _categorySection(
+            folder,
+            folder['name'] as String,
+            visible
+                .where((raw) => (raw as Map)['categoryId'] == folder['id'])
+                .toList(),
+          ),
+        ),
       ],
     );
   }
+
+  Widget _categorySection(
+    Map<String, dynamic>? folder,
+    String name,
+    List<dynamic> files,
+  ) => Card(
+    child: ExpansionTile(
+      initiallyExpanded: true,
+      leading: const Icon(Icons.folder_outlined),
+      title: Text('$name (${files.length})'),
+      trailing: folder != null && widget.admin
+          ? PopupMenuButton<String>(
+              onSelected: (v) => v == 'rename'
+                  ? renameCategory(folder)
+                  : deleteCategory(folder),
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'rename', child: Text('Umbenennen')),
+                PopupMenuItem(value: 'delete', child: Text('Löschen')),
+              ],
+            )
+          : null,
+      children: files.isEmpty
+          ? [const ListTile(title: Text('Keine Dateien'))]
+          : files
+                .map((raw) => _fileTile(raw as Map<dynamic, dynamic>))
+                .toList(),
+    ),
+  );
+  Widget _fileTile(Map<dynamic, dynamic> d) => ListTile(
+    leading: const Icon(Icons.description_outlined),
+    title: Text(d['title'] as String),
+    subtitle: Text(
+      '${d['description'] as String? ?? d['originalName']} · ${_formatSize((d['size'] as num).toInt())} · ${d['uploadedByName'] ?? ''}',
+    ),
+    onTap: () => preview(d),
+    trailing: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PreviewButton(mime: d['mimeType'] as String, onTap: () => preview(d)),
+        IconButton(
+          onPressed: () => download(d),
+          icon: const Icon(Icons.download),
+          tooltip: 'Herunterladen',
+        ),
+        if (widget.admin)
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'replace') upload(d);
+              if (v == 'move') move(d);
+              if (v == 'toggle') setActive(d, !(d['active'] as bool));
+              if (v == 'delete') remove(d);
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'replace',
+                child: Text('Datei ersetzen'),
+              ),
+              const PopupMenuItem(value: 'move', child: Text('Verschieben')),
+              PopupMenuItem(
+                value: 'toggle',
+                child: Text(
+                  (d['active'] as bool) ? 'Deaktivieren' : 'Aktivieren',
+                ),
+              ),
+              const PopupMenuItem(value: 'delete', child: Text('Löschen')),
+            ],
+          ),
+      ],
+    ),
+  );
 }
 
 class _AccessChoices extends StatelessWidget {
@@ -397,3 +610,6 @@ String category(String value) =>
       'form': 'Formulare',
     }[value] ??
     'Sonstiges';
+String _formatSize(int bytes) => bytes >= 1048576
+    ? '${(bytes / 1048576).toStringAsFixed(1)} MB'
+    : '${(bytes / 1024).toStringAsFixed(1)} KB';

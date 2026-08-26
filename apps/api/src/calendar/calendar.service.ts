@@ -253,13 +253,18 @@ export class CalendarService {
   // chosen provider so a mislabeled or spoofed link is rejected server-side
   // rather than trusted at face value.
   private validateMeeting(dto: SaveCalendarEventDto): void {
-    const hasProvider = dto.meetingProvider !== undefined;
-    const hasUrl = dto.meetingUrl !== undefined;
+    const hasProvider = typeof dto.meetingProvider === 'string' && dto.meetingProvider.length > 0;
+    const hasUrl = typeof dto.meetingUrl === 'string' && dto.meetingUrl.trim().length > 0;
     if (hasProvider !== hasUrl)
       throw new BadRequestException(
         'Meeting-Anbieter und Meeting-Link müssen gemeinsam angegeben werden.',
       );
-    if (!hasUrl) return;
+    if (!hasUrl) {
+      dto.meetingProvider = undefined;
+      dto.meetingUrl = undefined;
+      dto.meetingNotes = undefined;
+      return;
+    }
     if (!meetingHostMatchesProvider(dto.meetingUrl!, dto.meetingProvider!))
       throw new BadRequestException('Der Meeting-Link passt nicht zum ausgewählten Anbieter.');
   }

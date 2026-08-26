@@ -19,6 +19,11 @@ import { ProjectOrder } from './project-order.entity';
 import { Project, ProjectStatus } from './project.entity';
 import { PermissionService } from '../rbac/permission.service';
 import { AuditLog } from '../audit/audit-log.entity';
+import { ProjectFile } from './project-file.entity';
+import { detectDownload } from '../downloads/downloads.service';
+import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
+import { extname, join } from 'path';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class ProjectsService {
@@ -133,7 +138,12 @@ export class ProjectsService {
       `SELECT a.*,(u."firstName"||' '||u."lastName") actor FROM project_activities a JOIN users u ON u.id=a."actorUserId" WHERE a."projectId"=$1 ORDER BY a."createdAt" DESC LIMIT 50`,
       [id],
     );
-    return { ...project, access, members, cards, activities };
+    const files = await queryRows<Record<string, unknown>>(
+      this.db,
+      `SELECT f.id,f."originalName",f."mimeType",f.size::integer,f."createdAt",f."uploadedBy",(u."firstName"||' '||u."lastName") "uploadedByName" FROM project_files f JOIN users u ON u.id=f."uploadedBy" WHERE f."projectId"=$1 ORDER BY f."createdAt" DESC`,
+      [id],
+    );
+    return { ...project, access, members, cards, files, activities };
   }
   async create(actor: AuthenticatedUser, dto: CreateProjectDto) {
     return this.db.transaction(async (m) => {
@@ -415,12 +425,88 @@ export class ProjectsService {
       await this.audit(m, actor, 'project.deleted', 'project', id, { title: project.title });
     });
   }
+  async addFile(actor: AuthenticatedUser, projectId: string, file: Express.Multer.File) {
+    await this.access(actor, projectId, ProjectAccess.Edit);
+    const mime = detectDownload(file.buffer, file.originalname);
+    if (!mime)
+      throw new ForbiddenException(
+        'Dieser Dateityp ist nicht erlaubt oder der Dateiinhalt ist ungültig.',
+      );
+    const root = this.fileRoot();
+    await mkdir(root, { recursive: true });
+    const originalName = file.originalname.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 255);
+    const storedName = `${randomUUID()}${extname(originalName).toLowerCase()}`;
+    await writeFile(join(root, storedName), file.buffer, { mode: 0o640 });
+    try {
+      return await this.db.transaction(async (manager) => {
+        const saved = await manager.getRepository(ProjectFile).save({
+          projectId,
+          uploadedBy: actor.id,
+          originalName,
+          storedName,
+          mimeType: mime,
+          size: file.size,
+        });
+        await manager.getRepository(ProjectActivity).save({
+          projectId,
+          actorUserId: actor.id,
+          action: 'project.file.uploaded',
+          description: `Datei „${originalName}“ hochgeladen.`,
+        });
+        await this.audit(manager, actor, 'project.file.uploaded', 'project_file', saved.id, {
+          projectId,
+          fileName: originalName,
+          mimeType: mime,
+          size: file.size,
+        });
+        return { ...saved, storedName: undefined, size: Number(saved.size) };
+      });
+    } catch (error) {
+      await unlink(join(root, storedName)).catch(() => {});
+      throw error;
+    }
+  }
+  async file(actor: AuthenticatedUser, projectId: string, fileId: string) {
+    await this.access(actor, projectId, ProjectAccess.Read);
+    const file = await this.db.getRepository(ProjectFile).findOneBy({ id: fileId, projectId });
+    if (!file) throw new NotFoundException('Projektdatei wurde nicht gefunden.');
+    return { file, buffer: await readFile(join(this.fileRoot(), file.storedName)) };
+  }
+  async deleteFile(actor: AuthenticatedUser, projectId: string, fileId: string) {
+    await this.access(actor, projectId, ProjectAccess.Edit);
+    const file = await this.db.getRepository(ProjectFile).findOneBy({ id: fileId, projectId });
+    if (!file) throw new NotFoundException('Projektdatei wurde nicht gefunden.');
+    await this.db.transaction(async (manager) => {
+      await manager.getRepository(ProjectFile).remove(file);
+      await manager.getRepository(ProjectActivity).save({
+        projectId,
+        actorUserId: actor.id,
+        action: 'project.file.deleted',
+        description: `Datei „${file.originalName}“ gelöscht.`,
+      });
+      await this.audit(manager, actor, 'project.file.deleted', 'project_file', file.id, {
+        projectId,
+        fileName: file.originalName,
+      });
+    });
+    await unlink(join(this.fileRoot(), file.storedName)).catch(() => {});
+  }
+  private fileRoot() {
+    return this.config?.get<string>('PROJECT_FILE_STORAGE_PATH') ?? '/app/data/project-files';
+  }
   private async access(
     actor: AuthenticatedUser,
     id: string,
     need: ProjectAccess,
   ): Promise<ProjectAccess> {
-    if (await this.isSuperuser(actor)) return ProjectAccess.Admin;
+    if (await this.isSuperuser(actor)) {
+      const belongsToOrganization = await this.db.getRepository(Project).existsBy({
+        id,
+        organizationId: actor.organizationId,
+      });
+      if (!belongsToOrganization) throw new ForbiddenException('Kein Zugriff auf dieses Projekt.');
+      return ProjectAccess.Admin;
+    }
     const rows: Array<{ access: ProjectAccess }> = await this.db.query(
       `SELECT pm.access FROM project_members pm JOIN projects p ON p.id=pm."projectId" WHERE pm."projectId"=$1 AND pm."userId"=$2 AND p."organizationId"=$3 AND p."deletedAt" IS NULL`,
       [id, actor.id, actor.organizationId],

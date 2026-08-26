@@ -38,12 +38,14 @@ import { ProjectsModule } from './projects/projects.module';
 import { Project } from './projects/project.entity';
 import { DownloadsModule } from './downloads/downloads.module';
 import { Download } from './downloads/download.entity';
+import { DownloadFolder } from './downloads/download-category.entity';
 import { DownloadGroup, DownloadRole, DownloadUser } from './downloads/download-access.entity';
 import { ProjectMember } from './projects/project-member.entity';
 import { ProjectCard } from './projects/project-card.entity';
 import { ChecklistItem } from './projects/checklist-item.entity';
 import { ProjectActivity } from './projects/project-activity.entity';
 import { ProjectOrder } from './projects/project-order.entity';
+import { ProjectFile } from './projects/project-file.entity';
 import { MemberGraduation, MemberQualification } from './members/member-graduation.entity';
 import { MemberImportJob } from './members/member-import-job.entity';
 import { CalendarEvent } from './calendar/calendar-event.entity';
@@ -87,10 +89,12 @@ import { AuditModule } from './audit/audit.module';
           ChecklistItem,
           ProjectActivity,
           ProjectOrder,
+          ProjectFile,
           MemberGraduation,
           MemberQualification,
           MemberImportJob,
           Download,
+          DownloadFolder,
           DownloadGroup,
           DownloadRole,
           DownloadUser,

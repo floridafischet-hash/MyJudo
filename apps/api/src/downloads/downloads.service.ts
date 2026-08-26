@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
 import { extname, join } from 'path';
 import { unzipSync } from 'fflate';
-import { DataSource, In } from 'typeorm';
+import { DataSource, EntityManager, In } from 'typeorm';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { AuditLog } from '../audit/audit-log.entity';
 import { Role } from '../rbac/role.entity';
@@ -13,13 +13,19 @@ import { User } from '../users/user.entity';
 import { DownloadGroup, DownloadRole, DownloadUser } from './download-access.entity';
 import { Download } from './download.entity';
 import { ManageDownloadDto } from './dto/manage-download.dto';
+import { DownloadFolder } from './download-category.entity';
 const downloadTypes: Record<string, string> = {
   pdf: 'application/pdf',
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  txt: 'text/plain',
+  csv: 'text/csv',
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 @Injectable()
 export class DownloadsService {
@@ -33,7 +39,7 @@ export class DownloadsService {
   async list(actor: AuthenticatedUser, admin = false): Promise<Download[]> {
     const parameters = admin ? [actor.organizationId] : [actor.organizationId, actor.id];
     return await this.db.query(
-      `SELECT d.*${admin ? `,COALESCE((SELECT jsonb_agg(x."groupId") FROM download_groups x WHERE x."downloadId"=d.id),'[]') AS "groupIds",COALESCE((SELECT jsonb_agg(x."roleId") FROM download_roles x WHERE x."downloadId"=d.id),'[]') AS "roleIds",COALESCE((SELECT jsonb_agg(x."userId") FROM download_users x WHERE x."downloadId"=d.id),'[]') AS "userIds"` : ''} FROM downloads d WHERE d."organizationId"=$1 AND d."deletedAt" IS NULL ${admin ? '' : `AND d.active=true AND (d."availableToAll"=true OR EXISTS(SELECT 1 FROM download_users x WHERE x."downloadId"=d.id AND x."userId"=$2) OR EXISTS(SELECT 1 FROM download_groups x JOIN user_groups ug ON ug."groupId"=x."groupId" WHERE x."downloadId"=d.id AND ug."userId"=$2) OR EXISTS(SELECT 1 FROM download_roles x JOIN user_roles ur ON ur."roleId"=x."roleId" WHERE x."downloadId"=d.id AND ur."userId"=$2))`} ORDER BY d.category,d.title`,
+      `SELECT d.*,(u."firstName"||' '||u."lastName") AS "uploadedByName"${admin ? `,COALESCE((SELECT jsonb_agg(x."groupId") FROM download_groups x WHERE x."downloadId"=d.id),'[]') AS "groupIds",COALESCE((SELECT jsonb_agg(x."roleId") FROM download_roles x WHERE x."downloadId"=d.id),'[]') AS "roleIds",COALESCE((SELECT jsonb_agg(x."userId") FROM download_users x WHERE x."downloadId"=d.id),'[]') AS "userIds"` : ''} FROM downloads d JOIN users u ON u.id=d."uploadedBy" WHERE d."organizationId"=$1 AND d."deletedAt" IS NULL ${admin ? '' : `AND d.active=true AND (d."availableToAll"=true OR EXISTS(SELECT 1 FROM download_users x WHERE x."downloadId"=d.id AND x."userId"=$2) OR EXISTS(SELECT 1 FROM download_groups x JOIN user_groups ug ON ug."groupId"=x."groupId" WHERE x."downloadId"=d.id AND ug."userId"=$2) OR EXISTS(SELECT 1 FROM download_roles x JOIN user_roles ur ON ur."roleId"=x."roleId" WHERE x."downloadId"=d.id AND ur."userId"=$2))`} ORDER BY d."categoryId" NULLS LAST,d.title`,
       parameters,
     );
   }
@@ -63,6 +69,72 @@ export class DownloadsService {
         name: `${user.firstName} ${user.lastName}`.trim() || user.email,
       })),
     };
+  }
+  listCategories(actor: AuthenticatedUser) {
+    return this.db.getRepository(DownloadFolder).find({
+      where: { organizationId: actor.organizationId },
+      order: { position: 'ASC', name: 'ASC' },
+    });
+  }
+  async createCategory(actor: AuthenticatedUser, name: string) {
+    const normalized = name.trim();
+    const existing = await this.db
+      .getRepository(DownloadFolder)
+      .findOneBy({ organizationId: actor.organizationId, name: normalized });
+    if (existing)
+      throw new ForbiddenException('Eine Kategorie mit diesem Namen existiert bereits.');
+    const category = await this.db
+      .getRepository(DownloadFolder)
+      .save({ organizationId: actor.organizationId, name: normalized });
+    await this.log(actor, 'download.category.created', 'download_category', category.id, {
+      name: normalized,
+    });
+    return category;
+  }
+  async renameCategory(actor: AuthenticatedUser, id: string, name: string) {
+    const category = await this.category(actor, id);
+    const previousName = category.name;
+    category.name = name.trim();
+    const saved = await this.db.getRepository(DownloadFolder).save(category);
+    await this.log(actor, 'download.category.renamed', 'download_category', id, {
+      previousName,
+      name: saved.name,
+    });
+    return saved;
+  }
+  async removeCategory(actor: AuthenticatedUser, id: string) {
+    const category = await this.category(actor, id);
+    await this.db.transaction(async (manager) => {
+      await manager
+        .getRepository(Download)
+        .update({ organizationId: actor.organizationId, categoryId: id }, { categoryId: null });
+      await manager.getRepository(DownloadFolder).remove(category);
+      await manager.getRepository(AuditLog).save({
+        organizationId: actor.organizationId,
+        actorUserId: actor.id,
+        action: 'download.category.deleted',
+        entityType: 'download_category',
+        entityId: id,
+        outcome: 'success',
+        metadata: { name: category.name, filesMovedToUncategorized: true },
+      });
+    });
+  }
+  async move(actor: AuthenticatedUser, id: string, categoryId?: string) {
+    const download = await this.db
+      .getRepository(Download)
+      .findOneBy({ id, organizationId: actor.organizationId });
+    if (!download) throw new NotFoundException();
+    if (categoryId) await this.category(actor, categoryId);
+    const previousCategoryId = download.categoryId;
+    download.categoryId = categoryId ?? null;
+    await this.db.getRepository(Download).save(download);
+    await this.log(actor, 'download.file.moved', 'download', id, {
+      fileName: download.originalName,
+      previousCategoryId,
+      categoryId: download.categoryId,
+    });
+    return download;
   }
   async save(
     actor: AuthenticatedUser,
@@ -105,7 +177,9 @@ export class DownloadsService {
         category: dto.category,
         availableToAll: dto.availableToAll,
         active: dto.active,
+        categoryId: dto.categoryId ?? null,
       });
+      if (dto.categoryId) await this.category(actor, dto.categoryId, m);
       if (file) {
         await mkdir(this.root, { recursive: true });
         d.originalName = file.originalname.replace(/[^\p{L}\p{N}._ -]/gu, '_').slice(0, 255);
@@ -167,6 +241,35 @@ export class DownloadsService {
     });
     await unlink(join(this.root, d.storedName)).catch(() => {});
   }
+
+  private async category(
+    actor: AuthenticatedUser,
+    id: string,
+    manager: EntityManager = this.db.manager,
+  ) {
+    const category = await manager
+      .getRepository(DownloadFolder)
+      .findOneBy({ id, organizationId: actor.organizationId });
+    if (!category) throw new NotFoundException('Kategorie wurde nicht gefunden.');
+    return category;
+  }
+  private log(
+    actor: AuthenticatedUser,
+    action: string,
+    entityType: string,
+    entityId: string,
+    metadata: Record<string, unknown>,
+  ) {
+    return this.db.getRepository(AuditLog).save({
+      organizationId: actor.organizationId,
+      actorUserId: actor.id,
+      action,
+      entityType,
+      entityId,
+      outcome: 'success',
+      metadata,
+    });
+  }
 }
 
 export function detectDownload(buffer: Buffer, originalName: string): string | null {
@@ -180,11 +283,24 @@ export function detectDownload(buffer: Buffer, originalName: string): string | n
       : null;
   if (extension === 'jpg' || extension === 'jpeg')
     return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff ? expected : null;
-  if (extension === 'docx' || extension === 'xlsx') {
+  if (extension === 'gif')
+    return ['GIF87a', 'GIF89a'].includes(buffer.subarray(0, 6).toString()) ? expected : null;
+  if (extension === 'webp')
+    return buffer.subarray(0, 4).toString() === 'RIFF' &&
+      buffer.subarray(8, 12).toString() === 'WEBP'
+      ? expected
+      : null;
+  if (extension === 'txt' || extension === 'csv') return buffer.includes(0) ? null : expected;
+  if (extension === 'docx' || extension === 'xlsx' || extension === 'pptx') {
     if (buffer[0] !== 0x50 || buffer[1] !== 0x4b) return null;
     try {
       const files = Object.keys(unzipSync(buffer));
-      const marker = extension === 'docx' ? 'word/document.xml' : 'xl/workbook.xml';
+      const marker =
+        extension === 'docx'
+          ? 'word/document.xml'
+          : extension === 'xlsx'
+            ? 'xl/workbook.xml'
+            : 'ppt/presentation.xml';
       return files.includes('[Content_Types].xml') && files.includes(marker) ? expected : null;
     } catch {
       return null;

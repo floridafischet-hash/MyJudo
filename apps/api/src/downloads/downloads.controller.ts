@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Patch,
   Put,
   Req,
   Res,
@@ -20,7 +21,7 @@ import { Response } from 'express';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { PermissionGuard } from '../rbac/permission.guard';
 import { RequirePermissions } from '../rbac/permissions.decorator';
-import { ManageDownloadDto } from './dto/manage-download.dto';
+import { DownloadCategoryDto, ManageDownloadDto, MoveDownloadDto } from './dto/manage-download.dto';
 import { DownloadsService } from './downloads.service';
 type R = { user: AuthenticatedUser };
 const options = { limits: { fileSize: 10 * 1024 * 1024 } };
@@ -36,6 +37,35 @@ export class DownloadsController {
   }
   @Get('admin/options') @RequirePermissions('roles.manage') options(@Req() r: R) {
     return this.downloads.options(r.user);
+  }
+  @Get('categories') categories(@Req() r: R) {
+    return this.downloads.listCategories(r.user);
+  }
+  @Post('categories') @RequirePermissions('roles.manage') createCategory(
+    @Req() r: R,
+    @Body() dto: DownloadCategoryDto,
+  ) {
+    return this.downloads.createCategory(r.user, dto.name);
+  }
+  @Patch('categories/:id') @RequirePermissions('roles.manage') renameCategory(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: DownloadCategoryDto,
+  ) {
+    return this.downloads.renameCategory(r.user, id, dto.name);
+  }
+  @Delete('categories/:id') @HttpCode(204) @RequirePermissions('roles.manage') deleteCategory(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+  ) {
+    return this.downloads.removeCategory(r.user, id);
+  }
+  @Patch('admin/:id/category') @RequirePermissions('roles.manage') move(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: MoveDownloadDto,
+  ) {
+    return this.downloads.move(r.user, id, dto.categoryId);
   }
   @Get(':id/file') async file(
     @Req() r: R,

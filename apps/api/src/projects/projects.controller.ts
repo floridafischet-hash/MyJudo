@@ -92,6 +92,41 @@ export class ProjectsController {
     response.setHeader('Cache-Control', 'private, max-age=300');
     response.send(image.buffer);
   }
+  @Post(':id/files')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  addFile(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.projects.addFile(r.user, id, file);
+  }
+  @Get(':id/files/:fileId')
+  async file(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('fileId', new ParseUUIDPipe({ version: '4' })) fileId: string,
+    @Res() response: Response,
+  ): Promise<void> {
+    const result = await this.projects.file(r.user, id, fileId);
+    response.setHeader('Content-Type', result.file.mimeType);
+    response.setHeader('Content-Length', String(result.file.size));
+    response.setHeader(
+      'Content-Disposition',
+      `inline; filename*=UTF-8''${encodeURIComponent(result.file.originalName)}`,
+    );
+    response.setHeader('X-Content-Type-Options', 'nosniff');
+    response.send(result.buffer);
+  }
+  @Delete(':id/files/:fileId')
+  @HttpCode(204)
+  removeFile(
+    @Req() r: R,
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Param('fileId', new ParseUUIDPipe({ version: '4' })) fileId: string,
+  ) {
+    return this.projects.deleteFile(r.user, id, fileId);
+  }
   @Put(':id/cards/:cardId') updateCard(
     @Req() r: R,
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,

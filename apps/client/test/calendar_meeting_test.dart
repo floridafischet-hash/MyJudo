@@ -23,6 +23,41 @@ Future<void> _openDialog(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('keeps entered values and dialog open when saving fails', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showDialog<bool>(
+                context: context,
+                builder: (_) =>
+                    EventDialog(onSave: (_) async => throw Exception('Fehler')),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'Mein Termin');
+    await tester.pump();
+    final save = find.widgetWithText(FilledButton, 'Speichern');
+    expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+    tester.widget<FilledButton>(save).onPressed!();
+    await tester.pumpAndSettle();
+    expect(find.text('Mein Termin'), findsOneWidget);
+    expect(find.byKey(const Key('event-form-error')), findsOneWidget);
+    expect(
+      find.text('Termin konnte nicht gespeichert werden.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('hides the meeting link field until a provider is chosen', (
     tester,
   ) async {

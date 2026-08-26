@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
+import '../downloads/download_file.dart';
 
 class _ChecklistDraft {
   _ChecklistDraft() : title = TextEditingController();
@@ -658,6 +659,126 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
+  Future<void> _addFile() async {
+    final project = selected;
+    if (project == null) return;
+    final picked = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const [
+        'pdf',
+        'png',
+        'jpg',
+        'jpeg',
+        'gif',
+        'webp',
+        'txt',
+        'csv',
+        'docx',
+        'xlsx',
+        'pptx',
+      ],
+      withData: true,
+    );
+    final file = picked?.files.single;
+    if (file?.bytes == null) return;
+    try {
+      await api.post(
+        '/projects/${project['id']}/files',
+        data: FormData.fromMap({
+          'file': MultipartFile.fromBytes(file!.bytes!, filename: file.name),
+        }),
+        onSendProgress: (sent, total) {
+          if (mounted && total > 0) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                duration: const Duration(milliseconds: 500),
+                content: Text('Upload ${(sent * 100 / total).round()} %'),
+              ),
+            );
+          }
+        },
+      );
+      await _open(project['id'] as String);
+    } on DioException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_fileError(error)),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<List<int>> _fileBytes(Map<String, dynamic> file) async =>
+      (await api.get<List<int>>(
+        '/projects/${selected!['id']}/files/${file['id']}',
+        options: Options(responseType: ResponseType.bytes),
+      )).data!;
+  Future<void> _openFile(Map<String, dynamic> file) async {
+    final bytes = await _fileBytes(file);
+    if (!mounted) return;
+    final mime = file['mimeType'] as String;
+    if (mime.startsWith('image/')) {
+      await showDialog<void>(
+        context: context,
+        builder: (c) => Dialog(
+          child: Stack(
+            children: [
+              InteractiveViewer(child: Image.memory(Uint8List.fromList(bytes))),
+              Positioned(
+                top: 8,
+                right: 8,
+                child: IconButton.filled(
+                  onPressed: () => Navigator.pop(c),
+                  icon: const Icon(Icons.close),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (mime == 'application/pdf') {
+      final url = openBlobPreview(bytes, mime);
+      Future.delayed(const Duration(seconds: 30), () => revokeBlobUrl(url));
+    } else {
+      saveDownload(bytes, file['originalName'] as String, mime);
+    }
+  }
+
+  Future<void> _downloadFile(Map<String, dynamic> file) async => saveDownload(
+    await _fileBytes(file),
+    file['originalName'] as String,
+    file['mimeType'] as String,
+  );
+  Future<void> _deleteFile(Map<String, dynamic> file) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Datei löschen?'),
+        content: Text(
+          'Möchtest du „${file['originalName']}“ wirklich löschen?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('Abbrechen'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            child: const Text('Löschen'),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) {
+      final id = selected!['id'] as String;
+      await api.delete('/projects/$id/files/${file['id']}');
+      await _open(id);
+    }
+  }
+
   Future<void> _deleteProject() async {
     final p = selected;
     if (p == null) return;
@@ -1131,6 +1252,12 @@ class _ProjectsPageState extends State<ProjectsPage> {
                 icon: const Icon(Icons.add_photo_alternate_outlined),
                 label: const Text('Bild hinzufügen'),
               ),
+            if (editable)
+              FilledButton.icon(
+                onPressed: _addFile,
+                icon: const Icon(Icons.upload_file),
+                label: const Text('Datei hochladen'),
+              ),
             OutlinedButton.icon(
               onPressed: _addNote,
               icon: const Icon(Icons.note_add_outlined),
@@ -1234,6 +1361,50 @@ class _ProjectsPageState extends State<ProjectsPage> {
               .toList(),
         ),
         const SizedBox(height: 24),
+        Text('Dateien', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 8),
+        if ((p['files'] as List? ?? const []).isEmpty)
+          const Card(
+            child: Padding(
+              padding: EdgeInsets.all(18),
+              child: Text('Noch keine Projektdateien vorhanden.'),
+            ),
+          )
+        else
+          ...(p['files'] as List).map((raw) {
+            final file = Map<String, dynamic>.from(raw as Map);
+            return Card(
+              child: ListTile(
+                leading: Icon(
+                  (file['mimeType'] as String).startsWith('image/')
+                      ? Icons.image_outlined
+                      : Icons.description_outlined,
+                ),
+                title: Text(file['originalName'] as String),
+                subtitle: Text(
+                  '${_fileSize((file['size'] as num).toInt())} · ${file['mimeType']} · ${file['uploadedByName']}',
+                ),
+                onTap: () => _openFile(file),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: () => _downloadFile(file),
+                      tooltip: 'Herunterladen',
+                      icon: const Icon(Icons.download),
+                    ),
+                    if (editable)
+                      IconButton(
+                        onPressed: () => _deleteFile(file),
+                        tooltip: 'Löschen',
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        const SizedBox(height: 24),
         Text('Aktivitäten', style: Theme.of(context).textTheme.titleLarge),
         ...(p['activities'] as List? ?? []).map(
           (a) => ListTile(
@@ -1245,6 +1416,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
       ],
     );
   }
+}
+
+String _fileSize(int bytes) => bytes >= 1048576
+    ? '${(bytes / 1048576).toStringAsFixed(1)} MB'
+    : '${(bytes / 1024).toStringAsFixed(1)} KB';
+String _fileError(DioException error) {
+  final data = error.response?.data;
+  return data is Map && data['message'] != null
+      ? data['message'].toString()
+      : 'Die Datei konnte nicht hochgeladen werden.';
 }
 
 // One draggable row in the active project list. The default reorder handle

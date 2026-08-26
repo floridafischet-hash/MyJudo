@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
@@ -37,12 +37,26 @@ export class SaveCalendarEventDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) recurrenceInterval?: number;
   @IsOptional() @IsDateString() recurrenceUntil?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) recurrenceCount?: number;
-  @IsOptional() @IsEnum(CalendarMeetingProvider) meetingProvider?: CalendarMeetingProvider;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.length > 0 ? value : undefined,
+  )
+  @IsOptional()
+  @IsEnum(CalendarMeetingProvider)
+  meetingProvider?: CalendarMeetingProvider;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined,
+  )
   @IsOptional()
   @IsUrl({ protocols: ['https'], require_protocol: true, require_tld: true })
   @MaxLength(2048)
   meetingUrl?: string;
-  @IsOptional() @IsString() @MaxLength(500) meetingNotes?: string;
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined,
+  )
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  meetingNotes?: string;
 }
 
 export class EventScopeDto {
