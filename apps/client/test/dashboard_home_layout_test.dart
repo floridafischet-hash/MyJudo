@@ -6,23 +6,55 @@ import 'package:myjudo_client/src/auth/auth_controller.dart';
 import 'package:myjudo_client/src/auth/auth_session.dart';
 
 void main() {
-  testWidgets('shows upcoming events and project board on the home page', (
-    tester,
-  ) async {
-    _setScreenSize(tester, const Size(1400, 900));
-    await tester.pumpWidget(_signedInApp());
-    await tester.pumpAndSettle();
+  testWidgets(
+    'places calendar left at two thirds and overview right on wide screens',
+    (tester) async {
+      _setScreenSize(tester, const Size(1400, 900));
+      await tester.pumpWidget(_signedInApp());
+      await tester.pumpAndSettle();
 
-    expect(find.text('Pinnwand'), findsOneWidget);
-    expect(find.text('Kalender'), findsNothing);
-    expect(find.text('Kommende Termine'), findsOneWidget);
-    expect(find.text('Meine Termine'), findsNothing);
-    expect(find.text('Trainingszeiten'), findsNothing);
-    expect(find.text('Termine verwalten'), findsNothing);
-    expect(find.text('Gruppen'), findsNothing);
-    expect(find.text('Benutzer'), findsNothing);
-    expect(tester.takeException(), isNull);
-  });
+      final calendarColumn = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('Kalender'),
+              matching: find.byType(Expanded),
+            )
+            .first,
+      );
+      final upcomingColumn = tester.getRect(
+        find
+            .ancestor(
+              of: find.text('Kommende Termine'),
+              matching: find.byType(Expanded),
+            )
+            .first,
+      );
+      final projects = tester.getRect(find.text('Pinnwand'));
+      final upcoming = tester.getRect(find.text('Kommende Termine'));
+
+      expect(calendarColumn.top, upcomingColumn.top);
+      expect(calendarColumn.left, lessThan(upcomingColumn.left));
+      expect(calendarColumn.width / upcomingColumn.width, closeTo(2, 0.05));
+      expect(upcoming.top, lessThan(projects.top));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'stacks calendar, upcoming events and projects on narrow screens',
+    (tester) async {
+      _setScreenSize(tester, const Size(390, 844));
+      await tester.pumpWidget(_signedInApp());
+      await tester.pumpAndSettle();
+
+      final calendar = tester.getRect(find.text('Kalender'));
+      final upcoming = tester.getRect(find.text('Kommende Termine'));
+      final projects = tester.getRect(find.text('Pinnwand'));
+      expect(calendar.top, lessThan(upcoming.top));
+      expect(upcoming.top, lessThan(projects.top));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final size in [
     const Size(375, 812), // narrow phone
