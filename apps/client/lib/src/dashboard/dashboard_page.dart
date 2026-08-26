@@ -343,6 +343,12 @@ class _Content extends ConsumerWidget {
           ),
         const SizedBox(height: 28),
         if (index == 0 && accessToken != null) ...[
+          HomeCalendarSummary(
+            token: accessToken!,
+            showActivity: false,
+            maxUpcoming: 3,
+          ),
+          const SizedBox(height: 30),
           const Text(
             'Pinnwand',
             style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800),

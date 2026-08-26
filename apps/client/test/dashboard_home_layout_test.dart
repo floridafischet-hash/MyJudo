@@ -6,14 +6,16 @@ import 'package:myjudo_client/src/auth/auth_controller.dart';
 import 'package:myjudo_client/src/auth/auth_session.dart';
 
 void main() {
-  testWidgets('shows only the project board on the home page', (tester) async {
+  testWidgets('shows upcoming events and project board on the home page', (
+    tester,
+  ) async {
     _setScreenSize(tester, const Size(1400, 900));
     await tester.pumpWidget(_signedInApp());
     await tester.pumpAndSettle();
 
     expect(find.text('Pinnwand'), findsOneWidget);
     expect(find.text('Kalender'), findsNothing);
-    expect(find.text('Kommende Termine'), findsNothing);
+    expect(find.text('Kommende Termine'), findsOneWidget);
     expect(find.text('Meine Termine'), findsNothing);
     expect(find.text('Trainingszeiten'), findsNothing);
     expect(find.text('Termine verwalten'), findsNothing);
