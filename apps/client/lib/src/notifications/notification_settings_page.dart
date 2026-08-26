@@ -103,7 +103,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'MyJudo fragt erst nach deiner ausdrücklichen Aktivierung nach der Browser-Berechtigung.',
+              'Zenyo Kizuna fragt erst nach deiner ausdrücklichen Aktivierung nach der Browser-Berechtigung.',
             ),
             if (_error != null) ...[
               const SizedBox(height: 12),

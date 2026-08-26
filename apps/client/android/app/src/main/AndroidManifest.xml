@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="myjudo_client"
+        android:label="Zenyo Kizuna"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

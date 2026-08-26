@@ -101,7 +101,7 @@ class _ChatNotificationMonitorState extends State<ChatNotificationMonitor> {
                     : currentMessage.imageUrl != null
                     ? '${currentMessage.senderName} hat ein Bild gesendet.'
                     : 'Neue Nachricht'
-              : 'Öffne MyJudo, um die Nachricht zu lesen.',
+              : 'Öffne Zenyo Kizuna, um die Nachricht zu lesen.',
         );
       }
       _initialized = true;

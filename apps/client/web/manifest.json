@@ -1,6 +1,6 @@
 {
-    "name": "myjudo_client",
-    "short_name": "myjudo_client",
+    "name": "Zenyo Kizuna",
+    "short_name": "Zenyo Kizuna",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

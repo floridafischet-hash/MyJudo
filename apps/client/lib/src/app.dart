@@ -12,7 +12,7 @@ class MyJudoApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authControllerProvider);
     return MaterialApp(
-      title: 'MyJudo',
+      title: 'Zenyo Kizuna',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: const ColorScheme.light(

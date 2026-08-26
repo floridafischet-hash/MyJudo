@@ -516,7 +516,7 @@ class _WelcomeHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name.isEmpty ? 'Willkommen bei MyJudo' : 'Hallo $name',
+                  name.isEmpty ? 'Willkommen bei Zenyo Kizuna' : 'Hallo $name',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(

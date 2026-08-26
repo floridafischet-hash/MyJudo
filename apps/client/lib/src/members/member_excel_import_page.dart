@@ -303,7 +303,7 @@ class _MemberExcelImportPageState extends State<MemberExcelImportPage> {
                 ...(row['changes'] as List).map((x) {
                   final c = x as Map;
                   return Text(
-                    '${c['field']}: MyJudo „${c['current'] ?? '–'}“ → Excel „${c['excel'] ?? '–'}“',
+                    '${c['field']}: Zenyo Kizuna „${c['current'] ?? '–'}“ → Excel „${c['excel'] ?? '–'}“',
                   );
                 }),
                 DropdownButtonFormField<String>(
