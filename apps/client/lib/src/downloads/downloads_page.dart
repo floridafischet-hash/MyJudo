@@ -26,6 +26,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
   List<Map<String, dynamic>> categories = [];
   String search = '';
   bool loading = true;
+  String? loadError;
   @override
   void initState() {
     super.initState();
@@ -39,19 +40,35 @@ class _DownloadsPageState extends State<DownloadsPage> {
   }
 
   Future<void> load() async {
-    final results = await Future.wait([
-      api.get<List<dynamic>>(
-        widget.admin ? '/downloads/admin/all' : '/downloads',
-      ),
-      api.get<List<dynamic>>('/downloads/categories'),
-    ]);
     if (mounted) {
+      setState(() {
+        loading = true;
+        loadError = null;
+      });
+    }
+    try {
+      final results = await Future.wait([
+        api.get<List<dynamic>>(
+          widget.admin ? '/downloads/admin/all' : '/downloads',
+        ),
+        api.get<List<dynamic>>('/downloads/categories'),
+      ]);
+      if (!mounted) return;
       setState(() {
         items = results[0].data ?? [];
         categories = (results[1].data ?? [])
             .map((value) => Map<String, dynamic>.from(value as Map))
             .toList();
         loading = false;
+      });
+    } on DioException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        loadError = _apiMessage(
+          error,
+          'Downloads konnten nicht geladen werden.',
+        );
       });
     }
   }
@@ -416,6 +433,29 @@ class _DownloadsPageState extends State<DownloadsPage> {
   @override
   Widget build(BuildContext context) {
     if (loading) return const Center(child: CircularProgressIndicator());
+    if (loadError != null) {
+      return Center(
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off_outlined, size: 40),
+                const SizedBox(height: 12),
+                Text(loadError!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: load,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Erneut versuchen'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
     final visible = items.where((raw) {
       final d = raw as Map;
       return '${d['title']} ${d['originalName']} ${d['description'] ?? ''}'
@@ -511,7 +551,7 @@ class _DownloadsPageState extends State<DownloadsPage> {
     leading: const Icon(Icons.description_outlined),
     title: Text(d['title'] as String),
     subtitle: Text(
-      '${d['description'] as String? ?? d['originalName']} · ${_formatSize((d['size'] as num).toInt())} · ${d['uploadedByName'] ?? ''}',
+      '${d['description'] as String? ?? d['originalName']} · ${formatDownloadSize(d['size'])} · ${d['uploadedByName'] ?? ''}',
     ),
     onTap: () => preview(d),
     trailing: Row(
@@ -610,6 +650,20 @@ String category(String value) =>
       'form': 'Formulare',
     }[value] ??
     'Sonstiges';
+String formatDownloadSize(Object? rawBytes) {
+  final bytes = rawBytes is num ? rawBytes.toInt() : int.tryParse('$rawBytes');
+  if (bytes == null || bytes < 0) return 'Unbekannte Größe';
+  return _formatSize(bytes);
+}
+
 String _formatSize(int bytes) => bytes >= 1048576
     ? '${(bytes / 1048576).toStringAsFixed(1)} MB'
     : '${(bytes / 1024).toStringAsFixed(1)} KB';
+
+String _apiMessage(DioException error, String fallback) {
+  final data = error.response?.data;
+  if (data is Map && data['message'] is String) {
+    return data['message'] as String;
+  }
+  return fallback;
+}

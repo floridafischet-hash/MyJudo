@@ -27,6 +27,7 @@ export const PERMISSIONS = [
   'users.approve',
   'users.invite',
   'roles.manage',
+  'downloads.manage',
   'audit.view',
 ] as const;
 

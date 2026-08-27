@@ -6,10 +6,10 @@ describe('DownloadsController', () => {
     expect(
       // eslint-disable-next-line @typescript-eslint/unbound-method
       Reflect.getMetadata(REQUIRED_PERMISSIONS, DownloadsController.prototype['create']),
-    ).toEqual(['roles.manage']);
+    ).toEqual(['downloads.manage']);
     expect(
       // eslint-disable-next-line @typescript-eslint/unbound-method
       Reflect.getMetadata(REQUIRED_PERMISSIONS, DownloadsController.prototype['remove']),
-    ).toEqual(['roles.manage']);
+    ).toEqual(['downloads.manage']);
   });
 });

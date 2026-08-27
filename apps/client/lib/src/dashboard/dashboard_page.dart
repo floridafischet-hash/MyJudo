@@ -409,7 +409,7 @@ class _Content extends ConsumerWidget {
         else if (index == 5 && accessToken != null)
           DownloadsPage(
             token: accessToken!,
-            admin: permissions.contains('roles.manage'),
+            admin: permissions.contains('downloads.manage'),
           )
         else if (index == 6 && accessToken != null && isSuperuser) ...[
           NotificationSettingsPage(accessToken: accessToken!),
