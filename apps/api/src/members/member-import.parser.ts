@@ -141,12 +141,21 @@ export function parseMemberWorkbook(buffer: Buffer): ParsedMemberWorkbook {
   const columns = new Map<string, ImportField>();
   const ignoredFields: string[] = [];
   const unknownGreenFields: string[] = [];
+  // A workbook may keep unused green styles after being edited or exported.
+  // Only enable the DokuMe filter when a known header actually uses one of
+  // those styles. Otherwise plain Excel/LibreOffice/Google Sheets exports must
+  // be read by their header names.
+  const useGreenFilter = headerCells.some(
+    (cell) => green.styleIds.includes(cell.style) && headers[normalizeHeader(cell.value)],
+  );
   for (const cell of headerCells) {
     const field = headers[normalizeHeader(cell.value)];
-    if (green.styleIds.includes(cell.style) && field) columns.set(cell.column, field);
-    else if (!green.styleIds.includes(cell.style) && cell.value) ignoredFields.push(cell.value);
-    else if (green.styleIds.includes(cell.style) && !field)
+    const isGreen = green.styleIds.includes(cell.style);
+    if ((useGreenFilter ? isGreen : true) && field) columns.set(cell.column, field);
+    else if (useGreenFilter && !isGreen && cell.value) ignoredFields.push(cell.value);
+    else if (useGreenFilter && isGreen && !field)
       unknownGreenFields.push(cell.value || cell.column);
+    else if (!useGreenFilter && !field && cell.value) ignoredFields.push(cell.value);
   }
   // DokuMe exports omit H1. Accept this only when the green column contains a
   // plausible comma-separated belt/pass/qualification history.
@@ -168,7 +177,10 @@ export function parseMemberWorkbook(buffer: Buffer): ParsedMemberWorkbook {
     person.warnings = [];
     for (const [column, field] of columns) {
       const cell = raw.get(column);
-      if (!cell || !green.styleIds.includes(cell.style)) continue;
+      // Once a column was selected by a verified green header, read the whole
+      // column. Some spreadsheet programs retain the header fill but remove
+      // it from data cells during export.
+      if (!cell) continue;
       let value: string | number | null = clean(cell.value);
       if (field === 'birthDate' || field === 'lastGraduationDate') {
         const original = value;
@@ -335,12 +347,23 @@ function parseCells(sheet: string, strings: string[], defaults: Map<number, numb
     const raw = body.match(/<v>([\s\S]*?)<\/v>/)?.[1] ?? '';
     const column = ref[1]!;
     const colIndex = [...column].reduce((n, c) => n * 26 + c.charCodeAt(0) - 64, 0);
+    let value: string;
+    if (type === 's') {
+      value = strings[Number(raw)] ?? '';
+    } else if (type === 'inlineStr') {
+      // inline strings store text in <is><t>...</t></is>, not <v>
+      value = [...body.matchAll(/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g)]
+        .map((x) => decode(x[1]!))
+        .join('');
+    } else {
+      value = decode(raw);
+    }
     result.push({
       column,
       row: Number(ref[2]!),
       style: Number(attrs.match(/s="(\d+)"/)?.[1] ?? defaults.get(colIndex) ?? 0),
       type,
-      value: type === 's' ? (strings[Number(raw)] ?? '') : decode(raw),
+      value,
     });
   }
   return result;
@@ -359,11 +382,19 @@ function clean(v: string): string | null {
 }
 function parseGermanDate(v: string | number | null): string | null {
   if (v === null) return null;
-  const m = String(v).match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  const text = String(v).trim();
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);
+  if (iso) return validIsoDate(iso[1]!, iso[2]!, iso[3]!);
+  const serial = Number(text);
+  if (/^\d+(?:\.\d+)?$/.test(text) && serial > 0 && serial < 2958466) {
+    const date = new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86_400_000);
+    return date.toISOString().slice(0, 10);
+  }
+  const m = text.replaceAll('/', '.').match(/^(\d{1,2})[.-](\d{1,2})[.-](\d{4})$/);
   if (!m) return null;
-  const day = m[1]!,
-    month = m[2]!,
-    year = m[3]!;
+  return validIsoDate(m[3]!, m[2]!, m[1]!);
+}
+function validIsoDate(year: string, month: string, day: string): string | null {
   const d = new Date(Date.UTC(+year, +month - 1, +day));
   return d.getUTCFullYear() === +year && d.getUTCMonth() === +month - 1 && d.getUTCDate() === +day
     ? `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`

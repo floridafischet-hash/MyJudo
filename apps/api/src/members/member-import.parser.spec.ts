@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { buildGreenWorkbook } from '../../test/xlsx-fixture';
+import { buildGreenWorkbook, buildWorkbook } from '../../test/xlsx-fixture';
 import { parseMemberWorkbook, splitAchievements } from './member-import.parser';
 
 describe('DokuMe green member workbook parser', () => {
@@ -110,5 +110,45 @@ describe('synthetic green workbooks (header synonyms and history-derived grade)'
     expect(result.rows[0]?.warnings).toEqual([
       expect.stringContaining('weicht von der Prüfungshistorie'),
     ]);
+  });
+});
+
+describe('plain workbook compatibility', () => {
+  it('imports inline strings without green formatting', () => {
+    const result = parseMemberWorkbook(
+      buildWorkbook(
+        ['Vorname', 'Nachname', 'Geburtsdatum', 'E-Mail'],
+        [['Anna', 'Beispiel', '01.02.2000', 'anna@example.org']],
+        { inlineStrings: true },
+      ),
+    );
+
+    expect(result.recognizedFields).toEqual(
+      expect.arrayContaining(['firstName', 'lastName', 'birthDate', 'email']),
+    );
+    expect(result.rows[0]).toMatchObject({
+      firstName: 'Anna',
+      lastName: 'Beispiel',
+      birthDate: '2000-02-01',
+      email: 'anna@example.org',
+    });
+  });
+
+  it('ignores an unused green style and accepts Excel serial dates', () => {
+    const result = parseMemberWorkbook(
+      buildWorkbook(['Vorname', 'Nachname', 'Geburtsdatum'], [['Max', 'Mustermann', '36557']], {
+        includeUnusedGreenStyle: true,
+      }),
+    );
+
+    expect(result.green.styleIds).toEqual([1]);
+    expect(result.recognizedFields).toEqual(
+      expect.arrayContaining(['firstName', 'lastName', 'birthDate']),
+    );
+    expect(result.rows[0]).toMatchObject({
+      firstName: 'Max',
+      lastName: 'Mustermann',
+      birthDate: '2000-02-01',
+    });
   });
 });

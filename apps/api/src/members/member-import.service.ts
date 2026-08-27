@@ -30,6 +30,19 @@ export class MemberImportService {
     if (!file?.buffer?.length || !file.originalname.toLowerCase().endsWith('.xlsx'))
       throw new BadRequestException('Bitte eine XLSX-Datei auswählen.');
     const parsed = parseMemberWorkbook(file.buffer);
+    if (
+      !parsed.recognizedFields.includes('firstName') ||
+      !parsed.recognizedFields.includes('lastName')
+    ) {
+      throw new BadRequestException(
+        'In der Excel-Datei wurden die Spalten „Vorname“ und „Nachname“ nicht erkannt. Bitte prüfen Sie die Spaltenüberschriften.',
+      );
+    }
+    if (parsed.rows.length === 0) {
+      throw new BadRequestException(
+        'Die Excel-Datei enthält keine lesbaren Mitgliederzeilen unterhalb der Spaltenüberschriften.',
+      );
+    }
     const members = await this.db.getRepository(Member).find({
       where: { organizationId: actor.organizationId },
       order: { lastName: 'ASC', firstName: 'ASC' },
