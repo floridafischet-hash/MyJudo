@@ -148,6 +148,32 @@ Hier können:
 oder sich selbst zum Vorstand machen – das ist technisch ausgeschlossen und
 kann ausschließlich von einem bestehenden Superuser vergeben werden.
 
+### Mitgliederdaten aus Excel importieren
+
+Der Import akzeptiert makrofreie Dateien im Format **XLSX** bis 10 MB. Neben
+dem ursprünglichen DokuMe-Format werden auch übliche Exporte aus Microsoft
+Excel, LibreOffice und Google Sheets unterstützt. Grüne Zellformatierungen
+sind für normale Listen nicht erforderlich.
+
+Die erste Tabellenzeile muss mindestens die Spalten **„Vorname“** und
+**„Nachname“** enthalten. Weitere bekannte Überschriften wie
+„Geburtsdatum“, „E-Mail“, „Telefon“, „Straße“, „PLZ“, „Ort“, „Land“,
+„Nationalität“, „Höchste Graduierung“ und „Letzte Graduierung“ werden
+automatisch zugeordnet. Datumswerte können als deutsches Datum, ISO-Datum
+oder als Excel-Datumswert gespeichert sein.
+
+So funktioniert der Import:
+
+1. **„XLSX auswählen und analysieren“** anklicken und die Datei auswählen.
+2. Die erkannten Felder, Mitglieder und möglichen Konflikte in der Vorschau
+   kontrollieren. Zu diesem Zeitpunkt werden noch keine Daten verändert.
+3. Für jede Zeile „Erstellen“, „Aktualisieren“ oder „Überspringen“ wählen.
+4. Den Import ausdrücklich bestätigen.
+
+Wenn die Namensspalten oder keine lesbaren Mitgliederzeilen erkannt werden,
+zeigt die Anwendung eine konkrete Fehlermeldung, statt einen leeren Import
+anzulegen.
+
 ---
 
 ## 10. Häufige Fragen

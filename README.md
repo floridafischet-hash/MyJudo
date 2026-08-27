@@ -48,7 +48,9 @@ Produktiv erreichbar unter: `https://212.227.20.171:18780`
   Rollen und Gruppen zuweisen, Avatare verwalten.
 - **Audit-Log (nur Superuser)** – Nachvollziehbarkeit sicherheitsrelevanter
   Aktionen ohne Klartext-Passwörter, -Tokens oder Chatinhalte.
-- **Excel-Import** – Massenimport von Mitgliederdaten für Superuser.
+- **Excel-Import** – Vorschau und bestätigter Massenimport von Mitgliederdaten
+  für Superuser. Unterstützt DokuMe-Dateien sowie übliche makrofreie
+  XLSX-Exporte aus Excel, LibreOffice und Google Sheets.
 - **Downloads** – Dateiablage für Vereinsdokumente.
 
 ## Architektur

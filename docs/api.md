@@ -21,6 +21,9 @@ Basispräfix: `/api/v1`
 | `PATCH` | `/members/{id}/status` | `members.status.change` | Status oder Austritt ändern |
 | `GET` | `/members/export.csv` | `members.export` | UTF-8-CSV exportieren und auditieren |
 | `GET` | `/members/export.xlsx` | `members.export` | XLSX exportieren und auditieren |
+| `POST` | `/members/import/analyze` | `roles.manage` | Makrofreie XLSX-Datei prüfen und Importvorschau erzeugen |
+| `POST` | `/members/import/{id}/confirm` | `roles.manage` | Vorschau mit zeilenweisen Entscheidungen bestätigen |
+| `GET` | `/members/import/history` | `roles.manage` | Importprotokoll des eigenen Vereins auflisten |
 | `POST` | `/invitations` | `users.invite` | einmaliges Einladungstoken erstellen |
 | `POST` | `/invitations/{id}/revoke` | `users.invite` | Einladung widerrufen |
 | `POST` | `/invitations/accept` | Bearer-Token eines Pending-Kontos | Einladung einmalig annehmen |
@@ -34,3 +37,26 @@ Ungültige, abgelaufene, falsch ausgestellte oder nicht lokal zugeordnete
 Ungültige oder abgelaufene Tokens liefern HTTP 401. Fehlende Fach-Permissions liefern HTTP 403.
 Nicht sichtbare oder mandantenfremde Chats liefern zur Vermeidung von IDOR/BOLA
 einheitlich HTTP 404.
+
+## XLSX-Mitgliederimport
+
+`POST /members/import/analyze` erwartet das Multipart-Feld `file`. Erlaubt
+sind makrofreie XLSX-Dateien bis 10 MB. Der Parser unterstützt Shared Strings,
+Inline Strings, unformatierte Tabellen und DokuMe-Tabellen mit grünen
+Importspalten. Nicht mehr verwendete grüne Styles in der Arbeitsmappe lösen
+keinen irrtümlichen Formatfilter aus. Nach Auswahl einer gültigen Spalte werden
+deren Daten auch dann gelesen, wenn ein Tabellenprogramm die Zellformatierung
+beim Export nur in der Kopfzeile erhalten hat.
+
+Die Überschriften `Vorname` und `Nachname` sind erforderlich. Weitere deutsche
+und englische Synonyme werden normalisiert zugeordnet. Datumsfelder akzeptieren
+deutsche Schreibweisen, ISO-Daten und numerische Excel-Datumswerte. Die Analyse
+ändert keine Mitgliedsdaten und liefert Zeilenstatus, Konflikte, Warnungen und
+einmalige `rowId`-Werte zurück. Erst die Bestätigung führt die gewählten
+Aktionen transaktional aus; nicht ausgewählte oder explizit übersprungene
+Zeilen bleiben unverändert.
+
+Der produktive End-to-End-Test umfasst einen realen DokuMe-Upload sowie einen
+unformatierten Inline-String-Upload über die öffentliche API. Dabei wurden alle
+Testzeilen erkannt, die Bestätigungsroute mit `skip` fehlerfrei abgeschlossen
+und nachweislich keine Testmitglieder angelegt.
